@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-arena"
+version = "0.0.0"
+description = "Cost-aware, provider-agnostic evaluation platform for LLM agents."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+dependencies = [
+    "sqlalchemy>=2.0,<3.0",
+    "alembic>=1.13,<2.0",
+    "psycopg[binary]>=3.1,<4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.6,<1.0",
+    "mypy>=1.11,<2.0",
+    "pytest>=8.0,<9.0",
+    "testcontainers[postgres]>=4.0,<5.0",
+]
+
+# Importable code lives under packages/ as the PEP 420 ``agent_arena`` namespace.
+# Each area (db, adapters, schemas, ...) contributes its own subpackage and is
+# wired in here as the corresponding issue lands it.
+[tool.setuptools.packages.find]
+where = ["packages/db"]
+include = ["agent_arena*"]
+namespaces = true
+
+[tool.setuptools.package-data]
+"agent_arena.db" = ["py.typed"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["migrations/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "W"]
+
+[tool.ruff.format]
+line-ending = "lf"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+# The importable ``agent_arena`` namespace is assembled from packages/<area>;
+# each area's root goes on mypy_path so the fully-qualified module name is
+# unambiguous. New areas append their root here as they land.
+mypy_path = "packages/db"
+explicit_package_bases = true
+namespace_packages = true
+files = ["packages/db/agent_arena"]
+plugins = ["sqlalchemy.ext.mypy.plugin"]
+
+# Apps are services, not public packages: type-check them without --strict.
+[[tool.mypy.overrides]]
+module = "apps.*"
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+warn_return_any = false
+
+[tool.pytest.ini_options]
+testpaths = ["packages", "tests"]
+markers = [
+    "integration: tests that require Docker (spin real services such as Postgres)",
+]
