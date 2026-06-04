@@ -1,0 +1,15 @@
+# Anthropic pricing. USD per million tokens. One line per (model, valid_from);
+# a line is valid until the next line's valid_from for the same model.
+# Source: https://www.anthropic.com/pricing
+provider: anthropic
+prices:
+  - model: claude-opus-4-7
+    valid_from: 2026-02-15
+    input_per_million_tokens: 15.00
+    output_per_million_tokens: 75.00
+    cached_input_per_million_tokens: 1.50
+  - model: claude-sonnet-4-6
+    valid_from: 2026-02-15
+    input_per_million_tokens: 3.00
+    output_per_million_tokens: 15.00
+    cached_input_per_million_tokens: 0.30
