@@ -1,0 +1,20 @@
+# OpenAI pricing. USD per million tokens. One line per (model, valid_from);
+# a line is valid until the next line's valid_from for the same model.
+# Source: https://openai.com/api/pricing/
+provider: openai
+prices:
+  - model: gpt-4o
+    valid_from: 2024-05-13
+    input_per_million_tokens: 5.00
+    output_per_million_tokens: 15.00
+    cached_input_per_million_tokens: 2.50
+  - model: gpt-4o
+    valid_from: 2024-08-06
+    input_per_million_tokens: 2.50
+    output_per_million_tokens: 10.00
+    cached_input_per_million_tokens: 1.25
+  - model: gpt-4o-mini
+    valid_from: 2024-07-18
+    input_per_million_tokens: 0.15
+    output_per_million_tokens: 0.60
+    cached_input_per_million_tokens: 0.075

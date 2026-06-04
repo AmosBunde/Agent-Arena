@@ -1,0 +1,11 @@
+# Ollama runs models locally. There is no per-token price; cost is computed as
+# (latency_seconds / 3600) * hourly_rate, where hourly_rate is set per
+# deployment (default 0). A zero default makes local models look free relative
+# to commercial APIs, which they are not -- see ADR-0004.
+provider: ollama
+is_local: true
+prices:
+  - model: llama3.1:8b
+    valid_from: 2024-07-23
+  - model: qwen2.5:7b
+    valid_from: 2024-09-19

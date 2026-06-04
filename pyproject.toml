@@ -13,6 +13,7 @@ dependencies = [
     "sqlalchemy>=2.0,<3.0",
     "alembic>=1.13,<2.0",
     "psycopg[binary]>=3.1,<4.0",
+    "pyyaml>=6,<7",
 ]
 
 [project.optional-dependencies]
@@ -21,6 +22,7 @@ dev = [
     "mypy>=1.11,<2.0",
     "pytest>=8.0,<9.0",
     "testcontainers[postgres]>=4.0,<5.0",
+    "types-PyYAML>=6,<7",
 ]
 
 # Importable code is the PEP 420 ``agent_arena`` namespace, assembled from one
@@ -33,15 +35,19 @@ packages = [
     "agent_arena.db",
     "agent_arena.db.models",
     "agent_arena.adapters",
+    "agent_arena.cost_models",
+    "agent_arena.cost_models.data",
 ]
 
 [tool.setuptools.package-dir]
 "agent_arena.db" = "packages/db/agent_arena/db"
 "agent_arena.adapters" = "packages/adapters/agent_arena/adapters"
+"agent_arena.cost_models" = "packages/cost-models/agent_arena/cost_models"
 
 [tool.setuptools.package-data]
 "agent_arena.db" = ["py.typed"]
 "agent_arena.adapters" = ["py.typed"]
+"agent_arena.cost_models" = ["py.typed", "data/*.yaml"]
 
 [tool.ruff]
 line-length = 100
@@ -60,10 +66,14 @@ strict = true
 # The importable ``agent_arena`` namespace is assembled from packages/<area>;
 # each area's root goes on mypy_path so the fully-qualified module name is
 # unambiguous. New areas append their root here as they land.
-mypy_path = ["packages/db", "packages/adapters"]
+mypy_path = ["packages/db", "packages/adapters", "packages/cost-models"]
 explicit_package_bases = true
 namespace_packages = true
-files = ["packages/db/agent_arena", "packages/adapters/agent_arena"]
+files = [
+    "packages/db/agent_arena",
+    "packages/adapters/agent_arena",
+    "packages/cost-models/agent_arena",
+]
 plugins = ["sqlalchemy.ext.mypy.plugin"]
 
 # Apps are services, not public packages: type-check them without --strict.
