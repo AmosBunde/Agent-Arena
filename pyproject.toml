@@ -23,16 +23,25 @@ dev = [
     "testcontainers[postgres]>=4.0,<5.0",
 ]
 
-# Importable code lives under packages/ as the PEP 420 ``agent_arena`` namespace.
-# Each area (db, adapters, schemas, ...) contributes its own subpackage and is
-# wired in here as the corresponding issue lands it.
-[tool.setuptools.packages.find]
-where = ["packages/db"]
-include = ["agent_arena*"]
-namespaces = true
+# Importable code is the PEP 420 ``agent_arena`` namespace, assembled from one
+# directory per area (db, adapters, schemas, ...). setuptools' package finder
+# cannot split a single namespace across multiple roots, so each area's
+# concrete subpackages are mapped explicitly. New areas append their entries
+# to ``packages`` and ``package-dir`` as they land.
+[tool.setuptools]
+packages = [
+    "agent_arena.db",
+    "agent_arena.db.models",
+    "agent_arena.adapters",
+]
+
+[tool.setuptools.package-dir]
+"agent_arena.db" = "packages/db/agent_arena/db"
+"agent_arena.adapters" = "packages/adapters/agent_arena/adapters"
 
 [tool.setuptools.package-data]
 "agent_arena.db" = ["py.typed"]
+"agent_arena.adapters" = ["py.typed"]
 
 [tool.ruff]
 line-length = 100
@@ -51,10 +60,10 @@ strict = true
 # The importable ``agent_arena`` namespace is assembled from packages/<area>;
 # each area's root goes on mypy_path so the fully-qualified module name is
 # unambiguous. New areas append their root here as they land.
-mypy_path = "packages/db"
+mypy_path = ["packages/db", "packages/adapters"]
 explicit_package_bases = true
 namespace_packages = true
-files = ["packages/db/agent_arena"]
+files = ["packages/db/agent_arena", "packages/adapters/agent_arena"]
 plugins = ["sqlalchemy.ext.mypy.plugin"]
 
 # Apps are services, not public packages: type-check them without --strict.
