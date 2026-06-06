@@ -30,6 +30,7 @@ class Capability(Enum):
     STREAMING = "streaming"
     VISION = "vision"
     JSON_MODE = "json_mode"
+    PROMPT_CACHING = "prompt_caching"
 
 
 Role = Literal["system", "user", "assistant", "tool"]

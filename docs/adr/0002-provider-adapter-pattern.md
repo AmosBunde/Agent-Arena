@@ -79,6 +79,15 @@ The protocol is enforced at runtime via a registration check, not via static typ
 - LiteLLM: https://github.com/BerriAI/litellm
 - The Python typing.Protocol specification: PEP 544
 
+## Amendment: 2026-06-04
+
+**Change.** Added a `PROMPT_CACHING` member to the `Capability` enum.
+
+**Rationale.** The original decision named prompt caching as a feature that adapters would eventually expose and that capability negotiation should cover. The Anthropic adapter (issue #5) records cache-read tokens separately and bills them at the cached rate, so it advertises `PROMPT_CACHING`; adapters without it simply do not report it. The runner can therefore filter or annotate runs by caching support.
+
+**Consequences.** The addition is backward compatible: it is a new enum value, not a change to any method signature, so existing adapters and callers are unaffected. No deprecation window is required. Capabilities remain a frozen set returned per adapter instance; nothing about the negotiation contract changes.
+
 ## Revision history
 
 - 2026-05-11: Initial decision recorded.
+- 2026-06-04: Added `PROMPT_CACHING` capability (see amendment above).
