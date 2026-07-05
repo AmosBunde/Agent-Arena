@@ -354,3 +354,11 @@ def test_audit_log_records_state_changes(client: TestClient, migrated_url: str) 
         operations = set(session.execute(select(AuditLogEntry.operation)).scalars().all())
     sync_engine.dispose()
     assert {"task.create", "rubric.create", "agent.create", "run.create"} <= operations
+
+
+def test_leaderboard_refresh_requires_runner_role(client: TestClient) -> None:
+    assert client.get("/api/v1/leaderboard", headers=VIEWER).status_code == 200
+    denied = client.get("/api/v1/leaderboard", params={"refresh": "true"}, headers=VIEWER)
+    assert denied.status_code == 403
+    allowed = client.get("/api/v1/leaderboard", params={"refresh": "true"}, headers=RUNNER)
+    assert allowed.status_code == 200
