@@ -57,6 +57,8 @@ from apps.runner.tracing import build_trace, serialise_trace
 
 SessionFactory = Callable[[], Session]
 CancelProbe = Callable[[], bool]
+# Follow-up enqueue for judge scoring: (trace_hash, rubric_id).
+JudgeEnqueue = Callable[[str, uuid.UUID], None]
 
 
 class AdapterSource(Protocol):
@@ -98,6 +100,7 @@ def execute_run_sync(
     default_max_turns: int = 8,
     cancel_requested: CancelProbe = _never,
     trace_store: TraceStore | None = None,
+    enqueue_judge: JudgeEnqueue | None = None,
 ) -> ExecutionOutcome:
     """Execute one run to a terminal state. Safe to call again after a crash.
 
@@ -132,6 +135,7 @@ def execute_run_sync(
                 default_max_turns=default_max_turns,
                 cancel_requested=cancel_requested,
                 trace_store=trace_store,
+                enqueue_judge=enqueue_judge,
             )
         except RunCancelled:
             session.rollback()
@@ -162,6 +166,7 @@ def _execute(
     default_max_turns: int,
     cancel_requested: CancelProbe,
     trace_store: TraceStore | None,
+    enqueue_judge: JudgeEnqueue | None,
 ) -> ExecutionOutcome:
     try:
         task_row, agent_row, rubric_row = _load_catalog(session, run)
@@ -278,6 +283,10 @@ def _execute(
             )
         )
     _finish(session, run, "complete")
+    if rubric_row.judge_required and enqueue_judge is not None:
+        # Judge scoring is a follow-up job (system-design.md, Request
+        # lifecycle step 6); the run is already complete either way.
+        enqueue_judge(trace.hash, rubric_row.id)
     return ExecutionOutcome("complete", "success")
 
 
