@@ -1,0 +1,6 @@
+apiVersion: v2
+name: agent-arena
+description: Cost-aware, provider-agnostic evaluation platform for LLM agents.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

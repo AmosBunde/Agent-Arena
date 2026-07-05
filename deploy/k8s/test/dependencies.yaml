@@ -1,0 +1,76 @@
+# In-cluster stand-ins for the external services the chart requires, used
+# only by the kind smoke workflow. Production deployments bring managed
+# Postgres, Redis, and object storage (ADR-0001).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smoke-postgres
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: smoke-postgres } }
+  template:
+    metadata: { labels: { app: smoke-postgres } }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          env:
+            - { name: POSTGRES_USER, value: arena }
+            - { name: POSTGRES_PASSWORD, value: arena }
+            - { name: POSTGRES_DB, value: arena }
+          ports: [{ containerPort: 5432 }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: smoke-postgres }
+spec:
+  selector: { app: smoke-postgres }
+  ports: [{ port: 5432 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smoke-redis
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: smoke-redis } }
+  template:
+    metadata: { labels: { app: smoke-redis } }
+    spec:
+      containers:
+        - name: redis
+          image: redis:7
+          ports: [{ containerPort: 6379 }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: smoke-redis }
+spec:
+  selector: { app: smoke-redis }
+  ports: [{ port: 6379 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smoke-minio
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: smoke-minio } }
+  template:
+    metadata: { labels: { app: smoke-minio } }
+    spec:
+      containers:
+        - name: minio
+          image: minio/minio:RELEASE.2024-10-13T13-34-11Z
+          args: ["server", "/data"]
+          env:
+            - { name: MINIO_ROOT_USER, value: arena }
+            - { name: MINIO_ROOT_PASSWORD, value: arena-secret }
+          ports: [{ containerPort: 9000 }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: smoke-minio }
+spec:
+  selector: { app: smoke-minio }
+  ports: [{ port: 9000 }]

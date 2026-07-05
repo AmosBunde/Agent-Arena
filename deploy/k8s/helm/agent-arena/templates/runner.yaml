@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "agent-arena.fullname" . }}-runner
+  labels:
+    {{- include "agent-arena.labels" . | nindent 4 }}
+    app.kubernetes.io/component: runner
+spec:
+  {{- if not .Values.runner.autoscaling.enabled }}
+  replicas: {{ .Values.runner.autoscaling.minReplicas }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "agent-arena.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: runner
+  template:
+    metadata:
+      labels:
+        {{- include "agent-arena.labels" . | nindent 8 }}
+        app.kubernetes.io/component: runner
+    spec:
+      containers:
+        - name: runner
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - celery
+            - -A
+            - apps.runner.celery_app
+            - worker
+            - --concurrency={{ .Values.runner.concurrency }}
+            - --loglevel=INFO
+          env:
+            {{- include "agent-arena.appEnv" . | nindent 12 }}
+            - name: LOCAL_HOURLY_RATE_USD
+              value: {{ .Values.runner.localHourlyRateUsd | quote }}
+          {{- if .Values.runner.existingProviderSecret }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.runner.existingProviderSecret }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.runner.resources | nindent 12 }}
+{{- if .Values.runner.autoscaling.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "agent-arena.fullname" . }}-runner
+  labels:
+    {{- include "agent-arena.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "agent-arena.fullname" . }}-runner
+  minReplicas: {{ .Values.runner.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.runner.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.runner.autoscaling.targetCPUUtilizationPercentage }}
+{{- end }}
