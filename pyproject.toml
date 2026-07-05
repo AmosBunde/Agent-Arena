@@ -18,6 +18,8 @@ dependencies = [
     "google-genai>=2.0,<3",
     "anthropic>=0.69,<1",
     "httpx>=0.28,<1",
+    "celery>=5.4,<6",
+    "redis>=5,<7",
 ]
 
 [project.optional-dependencies]
@@ -71,13 +73,14 @@ strict = true
 # The importable ``agent_arena`` namespace is assembled from packages/<area>;
 # each area's root goes on mypy_path so the fully-qualified module name is
 # unambiguous. New areas append their root here as they land.
-mypy_path = ["packages/db", "packages/adapters", "packages/cost-models"]
+mypy_path = ["packages/db", "packages/adapters", "packages/cost-models", "."]
 explicit_package_bases = true
 namespace_packages = true
 files = [
     "packages/db/agent_arena",
     "packages/adapters/agent_arena",
     "packages/cost-models/agent_arena",
+    "apps/runner",
 ]
 plugins = ["sqlalchemy.ext.mypy.plugin"]
 
@@ -86,7 +89,13 @@ plugins = ["sqlalchemy.ext.mypy.plugin"]
 module = "apps.*"
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
+disallow_untyped_decorators = false
 warn_return_any = false
+
+# Celery ships no py.typed marker.
+[[tool.mypy.overrides]]
+module = ["celery.*", "kombu.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["packages", "tests"]

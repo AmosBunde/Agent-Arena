@@ -18,7 +18,7 @@ import pytest
 pytestmark = pytest.mark.integration
 
 
-def _seed(engine) -> None:  # type: ignore[no-untyped-def]
+def _seed(engine):  # type: ignore[no-untyped-def]
     """One agent and task scored under one rubric across three model groups.
 
     - ``cheap``: two runs, one cent each, both correct. CPCA 0.01.
@@ -111,6 +111,7 @@ def _seed(engine) -> None:  # type: ignore[no-untyped-def]
                     )
                 )
         session.commit()
+        return agent.id
 
 
 def test_leaderboard_cpca_ordering_and_refresh(database_url: str, alembic_config) -> None:  # type: ignore[no-untyped-def]
@@ -120,17 +121,27 @@ def test_leaderboard_cpca_ordering_and_refresh(database_url: str, alembic_config
 
     engine = create_engine(database_url)
     command.upgrade(alembic_config, "head")
-    _seed(engine)
+    agent_id = _seed(engine)
 
     # The view was created before the seed data existed; refresh picks it up.
-    # A second, concurrent refresh must be a no-op: identical rows out.
+    # A second, concurrent refresh must be a no-op: identical rows out. The
+    # container is shared across test modules, so assertions are scoped to
+    # the agent seeded here.
     refresh_leaderboard(engine, concurrently=False)
     with engine.connect() as connection:
-        first = connection.execute(leaderboard_query()).mappings().all()
+        first = [
+            row
+            for row in connection.execute(leaderboard_query()).mappings().all()
+            if row["agent_id"] == agent_id
+        ]
 
     refresh_leaderboard(engine, concurrently=True)
     with engine.connect() as connection:
-        rows = connection.execute(leaderboard_query()).mappings().all()
+        rows = [
+            row
+            for row in connection.execute(leaderboard_query()).mappings().all()
+            if row["agent_id"] == agent_id
+        ]
 
     assert rows == first, "refresh is not idempotent"
     assert [row["model"] for row in rows] == ["cheap", "pricey", "wrong"]
