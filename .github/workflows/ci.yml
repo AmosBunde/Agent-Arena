@@ -102,19 +102,27 @@ jobs:
           npx tsc --noEmit
           npm test -- --run
 
+  # Deploys the full single-VM stack from issue #12 and probes the health
+  # endpoints. Migrations run inside the api container entrypoint, so the
+  # schema path is exercised too. The timeout has headroom over the four
+  # minute target from issue #1 because cold image builds dominate; the
+  # measured happy path stays under four minutes.
   smoke:
     name: smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-python-env
       - name: Smoke deploy
-        env:
-          DATABASE_URL: postgresql+psycopg://arena:arena@localhost:5432/arena
         run: |
-          docker compose -f deploy/compose/postgres.yml up -d --wait
-          alembic upgrade head
+          docker compose -f deploy/compose/docker-compose.yml up -d --build --wait --wait-timeout 240
+          curl -fsS http://127.0.0.1:8000/health
+          curl -fsS http://127.0.0.1:3000/ > /dev/null
+          curl -fsS http://127.0.0.1:3000/api/v1/tasks > /dev/null
+          echo "Smoke checks passed."
+      - name: Logs on failure
+        if: failure()
+        run: docker compose -f deploy/compose/docker-compose.yml logs
       - name: Teardown
         if: always()
-        run: docker compose -f deploy/compose/postgres.yml down -v
+        run: docker compose -f deploy/compose/docker-compose.yml down -v
