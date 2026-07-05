@@ -9,45 +9,13 @@ Docker is absent.
 
 from __future__ import annotations
 
-import os
-import sys
 import uuid
-from collections.abc import Iterator
 from datetime import UTC, datetime
 from decimal import Decimal
-from pathlib import Path
 
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-# Make the namespace package importable even without an editable install.
-sys.path.insert(0, str(REPO_ROOT / "packages" / "db"))
-
 pytestmark = pytest.mark.integration
-
-
-@pytest.fixture(scope="module")
-def database_url() -> Iterator[str]:
-    try:
-        from testcontainers.postgres import PostgresContainer
-    except ImportError:  # pragma: no cover - dev dependency missing
-        pytest.skip("testcontainers is not installed")
-
-    try:
-        with PostgresContainer("postgres:16", driver="psycopg") as postgres:
-            yield postgres.get_connection_url()
-    except Exception as exc:  # pragma: no cover - Docker unavailable
-        pytest.skip(f"could not start Postgres container: {exc}")
-
-
-def _alembic_config(url: str):  # type: ignore[no-untyped-def]
-    from alembic.config import Config
-
-    os.environ["DATABASE_URL"] = url
-    config = Config(str(REPO_ROOT / "alembic.ini"))
-    config.set_main_option("script_location", str(REPO_ROOT / "migrations"))
-    config.set_main_option("sqlalchemy.url", url)
-    return config
 
 
 def _seed(engine) -> None:  # type: ignore[no-untyped-def]
@@ -145,24 +113,26 @@ def _seed(engine) -> None:  # type: ignore[no-untyped-def]
         session.commit()
 
 
-def test_leaderboard_cpca_ordering_and_refresh(database_url: str) -> None:
+def test_leaderboard_cpca_ordering_and_refresh(database_url: str, alembic_config) -> None:  # type: ignore[no-untyped-def]
     from agent_arena.db.leaderboard import leaderboard_query, refresh_leaderboard
     from alembic import command
     from sqlalchemy import create_engine
 
-    config = _alembic_config(database_url)
     engine = create_engine(database_url)
-    command.upgrade(config, "head")
+    command.upgrade(alembic_config, "head")
     _seed(engine)
 
     # The view was created before the seed data existed; refresh picks it up.
-    # Two consecutive refreshes prove idempotency, one of them concurrent.
+    # A second, concurrent refresh must be a no-op: identical rows out.
     refresh_leaderboard(engine, concurrently=False)
-    refresh_leaderboard(engine, concurrently=True)
+    with engine.connect() as connection:
+        first = connection.execute(leaderboard_query()).mappings().all()
 
+    refresh_leaderboard(engine, concurrently=True)
     with engine.connect() as connection:
         rows = connection.execute(leaderboard_query()).mappings().all()
 
+    assert rows == first, "refresh is not idempotent"
     assert [row["model"] for row in rows] == ["cheap", "pricey", "wrong"]
 
     by_model = {row["model"]: row for row in rows}
@@ -183,18 +153,20 @@ def test_leaderboard_cpca_ordering_and_refresh(database_url: str) -> None:
     engine.dispose()
 
 
-def test_downgrade_removes_aggregates(database_url: str) -> None:
+def test_downgrade_removes_aggregates(database_url: str, alembic_config) -> None:  # type: ignore[no-untyped-def]
     from alembic import command
     from sqlalchemy import create_engine, inspect
 
-    config = _alembic_config(database_url)
     engine = create_engine(database_url)
 
-    command.downgrade(config, "0001_m1_subset")
+    # Self-contained: reach head from whatever state the container is in,
+    # then walk one revision down and back up.
+    command.upgrade(alembic_config, "head")
+    command.downgrade(alembic_config, "0001_m1_subset")
     inspector = inspect(engine)
     assert "aggregates" not in set(inspector.get_schema_names())
 
-    command.upgrade(config, "head")
+    command.upgrade(alembic_config, "head")
     inspector = inspect(engine)
     assert "scores" in set(inspector.get_table_names(schema="aggregates"))
 

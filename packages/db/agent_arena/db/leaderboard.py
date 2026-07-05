@@ -9,13 +9,28 @@ view decision is ADR-0005.
 
 from __future__ import annotations
 
-from sqlalchemy import Column, Float, Integer, MetaData, Numeric, Select, Table, Text, select, text
+from sqlalchemy import (
+    BigInteger,
+    Column,
+    Float,
+    MetaData,
+    Numeric,
+    Select,
+    Table,
+    Text,
+    select,
+    text,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.engine import Engine
 
 # The scheduler refreshes the view on this interval (ADR-0005: five minutes).
 REFRESH_INTERVAL_SECONDS = 300
 
+# Deliberately NOT ``Base.metadata``: the migration environment autogenerates
+# against the shared metadata, and registering the view there would make
+# autogenerate emit a spurious ``create_table`` colliding with the
+# materialised view. Keep this Table on its own MetaData.
 _metadata = MetaData(schema="aggregates")
 
 # Static description of the materialised view for query building. The
@@ -28,8 +43,8 @@ leaderboard = Table(
     Column("provider", Text),
     Column("model", Text),
     Column("rubric_hash", Text),
-    Column("correct_count", Integer),
-    Column("total_count", Integer),
+    Column("correct_count", BigInteger),
+    Column("total_count", BigInteger),
     Column("mean_score", Numeric(6, 4)),
     Column("total_cost_usd", Numeric(12, 6)),
     Column("cost_per_correct_usd", Numeric(12, 6)),
@@ -56,11 +71,18 @@ def leaderboard_query() -> Select[tuple[object, ...]]:
     """The leaderboard in presentation order.
 
     CPCA ascending with NULLs last per ADR-0004: a group with zero correct
-    answers has no defined CPCA and sorts after every priced group. Ties
-    break on higher mean score, then lower total cost.
+    answers has no defined CPCA and sorts after every priced group. The
+    governing documents specify only the CPCA sort; the remaining keys are a
+    presentation-level decision (higher mean score, then lower total cost)
+    with the view's unique key last so pagination is deterministic.
     """
     return select(leaderboard).order_by(
         leaderboard.c.cost_per_correct_usd.asc().nulls_last(),
         leaderboard.c.mean_score.desc(),
         leaderboard.c.total_cost_usd.asc(),
+        leaderboard.c.agent_id,
+        leaderboard.c.task_id,
+        leaderboard.c.provider,
+        leaderboard.c.model,
+        leaderboard.c.rubric_hash,
     )

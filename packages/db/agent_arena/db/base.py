@@ -11,9 +11,8 @@ from sqlalchemy import MetaData
 from sqlalchemy.orm import DeclarativeBase
 
 # Logical schema namespaces. See ADR-0005: one Postgres instance, separated by
-# schema rather than by database. ``aggregates`` is intentionally absent from
-# the M1 subset (it lands with the leaderboard work, issue #10).
-SCHEMAS: tuple[str, ...] = ("catalog", "runs", "traces")
+# schema rather than by database.
+SCHEMAS: tuple[str, ...] = ("catalog", "runs", "traces", "aggregates")
 
 NAMING_CONVENTION = {
     "ix": "%(table_name)s_%(column_0_N_name)s_idx",

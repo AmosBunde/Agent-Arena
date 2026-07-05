@@ -20,10 +20,11 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
+# revision identifiers, used by Alembic.
 revision: str = "0002_aggregates"
 down_revision: str | None = "0001_m1_subset"
-branch_labels: Sequence[str] | None = None
-depends_on: Sequence[str] | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 _SCHEMA = "aggregates"
 
