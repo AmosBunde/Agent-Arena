@@ -27,15 +27,16 @@ None of these are revolutionary individually. The contribution is the combinatio
 The canonical deployment is single-VM Docker Compose, sized for a 20 USD per month cloud instance or a developer laptop. The production migration path is documented in [docs/deployment/kubernetes.md](docs/deployment/kubernetes.md) and is not required for any normal use of the project.
 
 ```bash
-git clone https://github.com/agent-arena-org/agent-arena.git
-cd agent-arena
+git clone https://github.com/AmosBunde/Agent-Arena.git
+cd Agent-Arena
 cp .env.example .env
 # Edit .env with at least one provider API key
-docker compose -f deploy/compose/docker-compose.yml up -d
-open http://localhost:3000
+set -a; . ./.env; set +a
+docker compose -f deploy/compose/docker-compose.yml up -d --build --wait
+open http://127.0.0.1:3000
 ```
 
-Time from clone to first leaderboard result: under five minutes on a fresh machine, assuming an API key is available.
+Time from clone to first leaderboard result: under five minutes on a fresh machine, assuming an API key is available. The full walkthrough, including seeding the example tasks and creating a first run, is in [docs/guides/quickstart.md](docs/guides/quickstart.md).
 
 ## How it works
 
