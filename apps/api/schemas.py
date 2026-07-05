@@ -174,3 +174,10 @@ class LeaderboardRowOut(BaseModel):
     cost_per_correct_usd: Decimal | None
     p50_latency_ms: float | None
     p95_latency_ms: float | None
+    # 95 percent percentile bootstrap intervals (issue #23); None until the
+    # scheduled job has computed the cell.
+    accuracy_ci_low: Decimal | None = None
+    accuracy_ci_high: Decimal | None = None
+    cpca_ci_low_usd: Decimal | None = None
+    cpca_ci_high_usd: Decimal | None = None
+    ci_resamples: int | None = None

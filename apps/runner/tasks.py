@@ -28,7 +28,7 @@ from agent_arena.trace_store import TraceStore, store_from_url
 from apps.runner.cancellation import is_cancellation_requested
 from apps.runner.celery_app import STALE_RUN_REAP_INTERVAL_SECONDS, celery_app, settings
 from apps.runner.db import get_engine, get_session_factory
-from apps.runner.execution import execute_run_sync, fail_stale_runs
+from apps.runner.execution import compute_leaderboard_cis, execute_run_sync, fail_stale_runs
 from apps.runner.judging import execute_judge_score
 
 logger = logging.getLogger(__name__)
@@ -122,6 +122,14 @@ def judge_score(trace_hash: str, rubric_id: str) -> str:
 def refresh_leaderboard_task() -> None:
     """Refresh the leaderboard materialised view (idempotent)."""
     refresh_leaderboard(get_engine(settings))
+
+
+@celery_app.task(name="runner.compute_leaderboard_ci")
+def compute_leaderboard_ci() -> int:
+    """Recompute bootstrap confidence intervals for leaderboard cells."""
+    updated = compute_leaderboard_cis(session_factory=get_session_factory(settings))
+    logger.info("computed bootstrap intervals for %d leaderboard cells", updated)
+    return updated
 
 
 @celery_app.task(name="runner.reap_stale_runs")

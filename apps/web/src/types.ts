@@ -76,6 +76,11 @@ export interface LeaderboardRow {
   cost_per_correct_usd: string | null;
   p50_latency_ms: number | null;
   p95_latency_ms: number | null;
+  accuracy_ci_low: string | null;
+  accuracy_ci_high: string | null;
+  cpca_ci_low_usd: string | null;
+  cpca_ci_high_usd: string | null;
+  ci_resamples: number | null;
 }
 
 export interface TraceMetadata {

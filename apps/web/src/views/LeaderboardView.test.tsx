@@ -18,6 +18,11 @@ const ROW: LeaderboardRow = {
   cost_per_correct_usd: "0.015000",
   p50_latency_ms: 120,
   p95_latency_ms: 250,
+  accuracy_ci_low: "0.3333",
+  accuracy_ci_high: "1.0000",
+  cpca_ci_low_usd: "0.010000",
+  cpca_ci_high_usd: "0.030000",
+  ci_resamples: 1000,
 };
 
 const ZERO_CORRECT: LeaderboardRow = {
@@ -25,6 +30,11 @@ const ZERO_CORRECT: LeaderboardRow = {
   model: "wrong-model",
   correct_count: 0,
   cost_per_correct_usd: null,
+  accuracy_ci_low: null,
+  accuracy_ci_high: null,
+  cpca_ci_low_usd: null,
+  cpca_ci_high_usd: null,
+  ci_resamples: null,
 };
 
 vi.mock("../api", () => ({
@@ -46,8 +56,8 @@ function renderView() {
 describe("LeaderboardView", () => {
   it("renders CPCA and shows zero-correct groups without a number", async () => {
     renderView();
-    expect(await screen.findByText("$0.015000")).toBeInTheDocument();
+    expect(await screen.findByText("$0.015000 ($0.010000 to $0.030000)")).toBeInTheDocument();
     expect(screen.getByText("no correct answers")).toBeInTheDocument();
-    expect(screen.getByText("2/3")).toBeInTheDocument();
+    expect(screen.getByText("2/3 (33% to 100%)")).toBeInTheDocument();
   });
 });
