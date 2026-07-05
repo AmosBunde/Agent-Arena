@@ -11,3 +11,4 @@ Closes #
 - [ ] New behaviour is covered by tests at the appropriate level.
 - [ ] Documentation is updated if user-facing behaviour changes.
 - [ ] ADRs are amended if architectural decisions are touched.
+- [ ] The commit history is clean enough that the reviewer can read it linearly.
