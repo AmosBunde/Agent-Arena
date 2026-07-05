@@ -1,0 +1,19 @@
+# Retrieval against the canned corpus; the agent must call the search tool.
+slug: search-1
+version: "1"
+domain: tool-use
+capabilities_required:
+  - tool_calling
+definition:
+  system: Use the search tool to find facts. Answer with the number only.
+  prompt: At what temperature in degrees Celsius does water boil at sea level?
+  expected: "100"
+  tools:
+    - search
+  search_corpus:
+    boiling point of water: Water boils at 100 degrees Celsius at sea level.
+    freezing point of water: Water freezes at 0 degrees Celsius at sea level.
+examples:
+  correct: "100"
+  incorrect: "212"
+recommended_rubric: exact-match

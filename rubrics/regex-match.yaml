@@ -1,0 +1,7 @@
+# The task's expected value is a regular expression searched against the
+# final answer.
+slug: regex-match
+version: "1"
+judge_required: false
+definition:
+  type: regex_match
