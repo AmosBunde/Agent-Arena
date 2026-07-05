@@ -8,6 +8,7 @@ import type {
   RunCreateRequest,
   RunGroup,
   Rubric,
+  ParetoRow,
   Score,
   Task,
   TraceBody,
@@ -61,6 +62,7 @@ export const api = {
     ),
   leaderboard: (refresh: boolean) =>
     request<LeaderboardRow[]>(`/api/v1/leaderboard${refresh ? "?refresh=true" : ""}`),
+  paretoFront: () => request<ParetoRow[]>("/api/v1/leaderboard/pareto"),
   listTraces: (runId?: string) =>
     request<TraceMetadata[]>(
       runId ? `/api/v1/traces?run_id=${encodeURIComponent(runId)}` : "/api/v1/traces",

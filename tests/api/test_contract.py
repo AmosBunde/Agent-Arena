@@ -354,6 +354,14 @@ def test_leaderboard_serves_view_rows(client: TestClient, migrated_url: str) -> 
     assert rows[0]["accuracy_ci_high"] is not None
     assert rows[0]["ci_resamples"] == 100
 
+    # Pareto view (issue #24): a single cell is trivially on the front.
+    pareto = client.get("/api/v1/leaderboard/pareto")
+    assert pareto.status_code == 200
+    pareto_rows = [row for row in pareto.json() if row["agent_id"] == refs["agent_id"]]
+    assert len(pareto_rows) == 1
+    assert pareto_rows[0]["on_front"] is True
+    assert Decimal(str(pareto_rows[0]["mean_cost_usd"])) == Decimal("0.02")
+
 
 def test_audit_log_records_state_changes(client: TestClient, migrated_url: str) -> None:
     from agent_arena.db.models import AuditLogEntry

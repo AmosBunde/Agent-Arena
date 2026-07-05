@@ -57,3 +57,7 @@ input {
 .muted {
   color: #666;
 }
+
+tr.dominated {
+  opacity: 0.45;
+}
