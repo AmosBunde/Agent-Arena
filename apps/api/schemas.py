@@ -117,7 +117,9 @@ class TraceMetadataOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     hash: str
+    run_id: uuid.UUID
     attempt_id: uuid.UUID
+    body_uri: str | None
     body_size_bytes: int
     total_input_tokens: int
     total_output_tokens: int
@@ -126,6 +128,26 @@ class TraceMetadataOut(BaseModel):
     latency_ms: int
     tool_call_count: int
     created_at: datetime
+
+
+class ScoreOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    trace_hash: str
+    rubric_hash: str
+    score: Decimal
+    is_correct: bool
+    score_detail: dict[str, Any]
+    judge_model: str | None
+    scored_at: datetime
+
+
+class TraceDetailOut(TraceMetadataOut):
+    scores: list[ScoreOut]
+
+
+class RescoreIn(BaseModel):
+    rubric_id: uuid.UUID
 
 
 class RunDetailOut(RunOut):
