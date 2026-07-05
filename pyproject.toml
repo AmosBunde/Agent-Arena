@@ -66,6 +66,11 @@ extend-exclude = ["migrations/versions"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "W"]
 
+# FastAPI's dependency injection uses function calls in argument defaults by
+# design; teach bugbear they are immutable.
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Header"]
+
 [tool.ruff.format]
 line-ending = "lf"
 

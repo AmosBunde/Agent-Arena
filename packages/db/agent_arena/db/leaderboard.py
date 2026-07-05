@@ -23,6 +23,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.engine import Engine
+from sqlalchemy.sql.elements import TextClause
 
 # The scheduler refreshes the view on this interval (ADR-0005: five minutes).
 REFRESH_INTERVAL_SECONDS = 300
@@ -53,18 +54,26 @@ leaderboard = Table(
 )
 
 
+def refresh_statement(*, concurrently: bool = True) -> TextClause:
+    """The refresh statement, shared by the scheduler and the API.
+
+    A concurrent refresh does not block readers and requires the unique index
+    from migration 0002, but cannot run inside a transaction block. A plain
+    refresh can, which is what the API's ``?refresh=true`` path uses inside
+    its request session.
+    """
+    keyword = " CONCURRENTLY" if concurrently else ""
+    return text(f"REFRESH MATERIALIZED VIEW{keyword} aggregates.leaderboard")
+
+
 def refresh_leaderboard(engine: Engine, *, concurrently: bool = True) -> None:
     """Refresh the materialised view. Idempotent; safe to run on a schedule.
 
-    A concurrent refresh does not block readers and requires the unique index
-    from migration 0002. ``REFRESH MATERIALIZED VIEW CONCURRENTLY`` cannot run
-    inside a transaction block, so the statement executes on an autocommit
-    connection.
+    ``REFRESH MATERIALIZED VIEW CONCURRENTLY`` cannot run inside a
+    transaction block, so the statement executes on an autocommit connection.
     """
-    keyword = " CONCURRENTLY" if concurrently else ""
-    statement = text(f"REFRESH MATERIALIZED VIEW{keyword} aggregates.leaderboard")
     with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as connection:
-        connection.execute(statement)
+        connection.execute(refresh_statement(concurrently=concurrently))
 
 
 def leaderboard_query() -> Select[tuple[object, ...]]:
