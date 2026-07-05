@@ -3,8 +3,9 @@ import { useState } from "react";
 import { LeaderboardView } from "./views/LeaderboardView";
 import { NewRunView } from "./views/NewRunView";
 import { TasksView } from "./views/TasksView";
+import { TracesView } from "./views/TracesView";
 
-const VIEWS = ["Tasks", "New run", "Leaderboard"] as const;
+const VIEWS = ["Tasks", "New run", "Leaderboard", "Traces"] as const;
 type View = (typeof VIEWS)[number];
 
 export function App() {
@@ -22,6 +23,7 @@ export function App() {
       {view === "Tasks" && <TasksView />}
       {view === "New run" && <NewRunView />}
       {view === "Leaderboard" && <LeaderboardView />}
+      {view === "Traces" && <TracesView />}
     </main>
   );
 }
