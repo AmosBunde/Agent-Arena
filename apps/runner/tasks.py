@@ -21,6 +21,7 @@ from agent_arena.adapters import default_registry
 from agent_arena.adapters import google_adapter as _google  # noqa: F401
 from agent_arena.adapters import ollama_adapter as _ollama  # noqa: F401
 from agent_arena.adapters import openai_adapter as _openai  # noqa: F401
+from agent_arena.adapters import vllm_adapter as _vllm  # noqa: F401
 from agent_arena.db.leaderboard import refresh_leaderboard
 from agent_arena.trace_store import TraceStore, store_from_url
 
@@ -36,6 +37,7 @@ logger = logging.getLogger(__name__)
 # (ADR-0004: configurable hourly rate); token-priced adapters take none.
 _ADAPTER_KWARGS: dict[str, dict[str, object]] = {
     "ollama": {"hourly_rate": settings.local_hourly_rate_usd},
+    "vllm": {"hourly_rate": settings.local_hourly_rate_usd},
 }
 
 _redis_client: redis.Redis | None = None
