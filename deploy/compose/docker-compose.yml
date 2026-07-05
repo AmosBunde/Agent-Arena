@@ -1,0 +1,160 @@
+# The canonical single-VM deployment (ADR-0001): every service as a
+# container on one host. docker compose -f deploy/compose/docker-compose.yml
+# up -d --wait produces a working stack; the web UI is at
+# http://127.0.0.1:3000 and the API at http://127.0.0.1:8000.
+#
+# The API and web ports bind to 127.0.0.1 deliberately: the Compose
+# deployment is an unauthenticated single-user tool (session-design.md).
+# Exposing it on a public interface requires an auth proxy in front.
+#
+# Provider API keys are read from the host environment and passed only to
+# the runner; they are never written to the database or logged
+# (system-design.md, Security).
+
+x-app-env: &app_env
+  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-arena}:${POSTGRES_PASSWORD:-arena}@postgres:5432/${POSTGRES_DB:-arena}
+  REDIS_URL: redis://redis:6379/0
+
+x-app-build: &app_build
+  context: ../..
+  dockerfile: deploy/docker/Dockerfile
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-arena}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-arena}
+      POSTGRES_DB: ${POSTGRES_DB:-arena}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-arena} -d ${POSTGRES_DB:-arena}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build: *app_build
+    image: agent-arena:latest
+    environment:
+      <<: *app_env
+      # Only the api runs migrations, exactly once per rollout
+      # (docs/design/database-schema.md, Migration approach).
+      RUN_MIGRATIONS: "1"
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  runner:
+    image: agent-arena:latest
+    build: *app_build
+    # Four workers, one run each (system-design.md, Concurrency model).
+    command:
+      [
+        "celery",
+        "-A",
+        "apps.runner.celery_app",
+        "worker",
+        "--concurrency=4",
+        "--loglevel=INFO",
+      ]
+    environment:
+      <<: *app_env
+      LOCAL_HOURLY_RATE_USD: ${LOCAL_HOURLY_RATE_USD:-0}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "celery -A apps.runner.celery_app inspect ping -d celery@$$HOSTNAME --timeout 5",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  scheduler:
+    image: agent-arena:latest
+    build: *app_build
+    command:
+      [
+        "celery",
+        "-A",
+        "apps.runner.celery_app",
+        "beat",
+        "--loglevel=INFO",
+        "--pidfile=/tmp/beat.pid",
+        "--schedule=/tmp/beat-schedule",
+      ]
+    environment: *app_env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "test -s /tmp/beat.pid"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/web.Dockerfile
+    ports:
+      - "127.0.0.1:3000:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      # 127.0.0.1 explicitly: busybox wget resolves localhost to ::1 while
+      # nginx listens on IPv4.
+      test: ["CMD-SHELL", "wget --quiet --spider http://127.0.0.1:80/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
