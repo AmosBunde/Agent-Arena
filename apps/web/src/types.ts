@@ -161,3 +161,17 @@ export interface TraceBody {
     tool_call_count: number;
   };
 }
+
+export interface ParetoRow {
+  agent_id: string;
+  task_id: string;
+  provider: string;
+  model: string;
+  rubric_hash: string;
+  correct_count: number;
+  total_count: number;
+  accuracy: string;
+  mean_cost_usd: string;
+  cost_per_correct_usd: string | null;
+  on_front: boolean;
+}

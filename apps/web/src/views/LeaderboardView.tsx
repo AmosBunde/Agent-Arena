@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api } from "../api";
+import { ParetoView } from "./ParetoView";
 
 // ADR-0004: a group with zero correct answers has no defined CPCA; the UI
 // shows "no correct answers" rather than a number.
@@ -32,6 +33,7 @@ function formatAccuracy(row: {
 export function LeaderboardView() {
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
+  const [mode, setMode] = useState<"table" | "pareto">("table");
   const leaderboard = useQuery({
     queryKey: ["leaderboard"],
     queryFn: () => api.leaderboard(false),
@@ -51,11 +53,21 @@ export function LeaderboardView() {
   if (leaderboard.isError)
     return <p className="error">Could not load the leaderboard: {leaderboard.error.message}</p>;
 
+  if (mode === "pareto") {
+    return (
+      <div>
+        <button onClick={() => setMode("table")}>table view</button>
+        <ParetoView />
+      </div>
+    );
+  }
+
   return (
     <div>
       <button onClick={() => void refreshNow()} disabled={refreshing}>
         {refreshing ? "Refreshing..." : "Refresh now"}
       </button>
+      <button onClick={() => setMode("pareto")}>Pareto view</button>
       {leaderboard.data.length === 0 ? (
         <p className="muted">No scored runs yet. Create a run and check back.</p>
       ) : (

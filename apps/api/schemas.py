@@ -161,6 +161,20 @@ class CancellationOut(BaseModel):
     detail: str
 
 
+class ParetoRowOut(BaseModel):
+    agent_id: uuid.UUID
+    task_id: uuid.UUID
+    provider: str
+    model: str
+    rubric_hash: str
+    correct_count: int
+    total_count: int
+    accuracy: Decimal
+    mean_cost_usd: Decimal
+    cost_per_correct_usd: Decimal | None
+    on_front: bool
+
+
 class LeaderboardRowOut(BaseModel):
     agent_id: uuid.UUID
     task_id: uuid.UUID
