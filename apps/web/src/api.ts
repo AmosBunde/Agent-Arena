@@ -1,7 +1,19 @@
 // Thin typed client over the v1 API. The base URL is same-origin by
 // default; the Vite dev server proxies /api to the local API service.
 
-import type { Agent, LeaderboardRow, Run, RunCreateRequest, RunGroup, Rubric, Task } from "./types";
+import type {
+  Agent,
+  LeaderboardRow,
+  Run,
+  RunCreateRequest,
+  RunGroup,
+  Rubric,
+  Score,
+  Task,
+  TraceBody,
+  TraceDetail,
+  TraceMetadata,
+} from "./types";
 
 const BASE = import.meta.env.VITE_API_BASE_URL ?? "";
 
@@ -49,4 +61,16 @@ export const api = {
     ),
   leaderboard: (refresh: boolean) =>
     request<LeaderboardRow[]>(`/api/v1/leaderboard${refresh ? "?refresh=true" : ""}`),
+  listTraces: (runId?: string) =>
+    request<TraceMetadata[]>(
+      runId ? `/api/v1/traces?run_id=${encodeURIComponent(runId)}` : "/api/v1/traces",
+    ),
+  getTrace: (hash: string) => request<TraceDetail>(`/api/v1/traces/${encodeURIComponent(hash)}`),
+  getTraceBody: (hash: string) =>
+    request<TraceBody>(`/api/v1/traces/${encodeURIComponent(hash)}/body`),
+  rescoreTrace: (hash: string, rubricId: string) =>
+    request<Score>(`/api/v1/traces/${encodeURIComponent(hash)}/score`, {
+      method: "POST",
+      body: JSON.stringify({ rubric_id: rubricId }),
+    }),
 };

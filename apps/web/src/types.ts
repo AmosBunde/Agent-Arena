@@ -77,3 +77,82 @@ export interface LeaderboardRow {
   p50_latency_ms: number | null;
   p95_latency_ms: number | null;
 }
+
+export interface TraceMetadata {
+  hash: string;
+  run_id: string;
+  attempt_id: string;
+  body_uri: string | null;
+  body_size_bytes: number;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  total_cached_tokens: number;
+  estimated_cost_usd: string;
+  latency_ms: number;
+  tool_call_count: number;
+  created_at: string;
+}
+
+export interface Score {
+  trace_hash: string;
+  rubric_hash: string;
+  score: string;
+  is_correct: boolean;
+  score_detail: Record<string, unknown>;
+  judge_model: string | null;
+  scored_at: string;
+}
+
+export interface TraceDetail extends TraceMetadata {
+  scores: Score[];
+}
+
+export interface TraceToolCall {
+  id: string;
+  name: string;
+  arguments: Record<string, unknown>;
+}
+
+export interface TraceMessage {
+  role: string;
+  content: string | null;
+  tool_calls: TraceToolCall[];
+  tool_call_id: string | null;
+  name: string | null;
+}
+
+export interface TraceStep {
+  index: number;
+  request_messages: TraceMessage[];
+  response: {
+    content: string | null;
+    finish_reason: string | null;
+    tool_calls: TraceToolCall[];
+    usage: { prompt_tokens: number; completion_tokens: number; cached_tokens: number };
+    latency_ms: number;
+    provider_metadata: Record<string, unknown>;
+  };
+  tool_results: { tool_call_id: string; name: string; output: string }[];
+}
+
+export interface TraceBody {
+  schema_version: number;
+  run_id: string;
+  attempt_number: number;
+  provider: string;
+  model: string;
+  parameters: { temperature: number | null; tools: string[] };
+  task: { slug: string; version: string };
+  agent: { slug: string; version: string };
+  steps: TraceStep[];
+  final_answer: string | null;
+  turn_limit_reached: boolean;
+  error: string | null;
+  totals: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    cached_tokens: number;
+    latency_ms: number;
+    tool_call_count: number;
+  };
+}
