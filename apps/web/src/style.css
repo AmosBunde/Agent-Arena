@@ -1,0 +1,59 @@
+/* Function over form (issue #11): readable defaults, no design system. */
+
+:root {
+  font-family: system-ui, sans-serif;
+  color: #1a1a1a;
+  background: #fafafa;
+}
+
+body {
+  margin: 0 auto;
+  max-width: 72rem;
+  padding: 1rem;
+}
+
+nav button {
+  margin-right: 0.5rem;
+  padding: 0.4rem 0.9rem;
+}
+
+nav button[aria-current="true"] {
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-top: 1rem;
+}
+
+th,
+td {
+  border: 1px solid #ccc;
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+form fieldset {
+  margin-bottom: 1rem;
+}
+
+label {
+  display: block;
+  margin: 0.4rem 0;
+}
+
+select,
+input {
+  margin-left: 0.4rem;
+}
+
+.error {
+  color: #b00020;
+}
+
+.muted {
+  color: #666;
+}
