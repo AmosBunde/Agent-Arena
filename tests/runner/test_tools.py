@@ -71,3 +71,21 @@ def test_search_no_results() -> None:
 def test_unknown_tool_name() -> None:
     with pytest.raises(ToolExecutionError, match="unknown tool"):
         execute_tool("web_browser", {}, TASK)
+
+
+@pytest.mark.parametrize(
+    "expression",
+    ["9**9**9", "1000001 ** 2", "2 ** 1001", "(" * 300 + "1" + ")" * 300],
+)
+def test_calculator_rejects_resource_exhaustion(expression: str) -> None:
+    with pytest.raises(ToolExecutionError):
+        execute_tool("calculator", {"expression": expression}, TASK)
+
+
+def test_calculator_rejects_oversized_expression() -> None:
+    with pytest.raises(ToolExecutionError, match="exceeds"):
+        execute_tool("calculator", {"expression": "1+" * 300 + "1"}, TASK)
+
+
+def test_calculator_allows_bounded_pow() -> None:
+    assert execute_tool("calculator", {"expression": "2 ** 16"}, TASK) == "65536"

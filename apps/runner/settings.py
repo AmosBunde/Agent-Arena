@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from decimal import Decimal
 
 
 @dataclass(frozen=True, slots=True)
@@ -16,9 +17,12 @@ class RunnerSettings:
 
     database_url: str
     redis_url: str
-    # Hard ceiling on agent loop turns when neither the task nor the agent
-    # sets one.
+    # Ceiling on agent loop turns when the task does not set max_turns.
     default_max_turns: int
+    # Amortised cost of local compute for local model adapters (ADR-0004).
+    # Defaults to zero, which makes local models look free; deployments that
+    # care set LOCAL_HOURLY_RATE_USD.
+    local_hourly_rate_usd: Decimal
     # Celery hard time limit per run (session-design.md: default ten minutes).
     run_time_limit_seconds: int
     # Soft limit fires SoftTimeLimitExceeded inside the task shortly before
@@ -35,6 +39,7 @@ class RunnerSettings:
             ),
             redis_url=os.environ.get("REDIS_URL", "redis://localhost:6379/0"),
             default_max_turns=int(os.environ.get("RUNNER_DEFAULT_MAX_TURNS", "8")),
+            local_hourly_rate_usd=Decimal(os.environ.get("LOCAL_HOURLY_RATE_USD", "0")),
             run_time_limit_seconds=hard,
             run_soft_time_limit_seconds=int(
                 os.environ.get("RUNNER_SOFT_TIME_LIMIT_SECONDS", str(max(hard - 30, 1)))

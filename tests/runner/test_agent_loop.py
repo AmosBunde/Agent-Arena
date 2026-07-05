@@ -9,7 +9,7 @@ from agent_arena.adapters import ToolCall
 
 from apps.runner.agent_loop import RunCancelled, run_agent_loop
 from apps.runner.contracts import AgentDefinition, TaskDefinition
-from tests.runner.conftest import FakeAdapter, response
+from tests.runner.fakes import FakeAdapter, response
 
 
 def _run(coro):  # type: ignore[no-untyped-def]

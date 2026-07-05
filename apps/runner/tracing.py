@@ -1,13 +1,23 @@
 """Trace assembly and hashing.
 
-The trace captures every provider round trip in the run. In M1 the body is
-serialised deterministically (sorted keys, compact separators) to compute the
-content hash and size recorded in ``traces.trace_metadata``; ``body_uri``
-stays NULL until the content-addressed store lands (M2, issues #15 and #16),
-at which point the canonical serialisation defined there replaces this
-interim form. Authorization material never enters the trace: adapters read
-credentials from the environment and messages contain only conversation
-content (system-design.md, Security).
+The trace captures every provider round trip in the run, including the
+request parameters (temperature, offered tools) so the capture is auditable.
+In M1 the body is serialised deterministically (sorted keys, compact
+separators) to compute the content hash and size recorded in
+``traces.trace_metadata``; ``body_uri`` stays NULL until the
+content-addressed store lands (M2, issues #15 and #16), at which point the
+canonical serialisation defined there replaces this interim form.
+
+The interim body includes run and attempt identity, which makes every hash
+unique per attempt. That deliberately trades the cross-run deduplication
+property of ADR-0003 for insert safety: ``traces.trace_metadata`` keys on the
+hash and carries a run id, so two runs cannot share a row today. The
+canonical serialisation issue (#15) owns content-addressed identity and the
+migration of these interim hashes.
+
+Authorization material never enters the trace: adapters read credentials
+from the environment and messages contain only conversation content
+(system-design.md, Security).
 """
 
 from __future__ import annotations
@@ -35,6 +45,7 @@ class SerialisedTrace:
 def build_trace(
     *,
     run_id: uuid.UUID,
+    attempt_number: int,
     provider: str,
     model: str,
     task_slug: str,
@@ -42,14 +53,18 @@ def build_trace(
     agent_slug: str,
     agent_version: str,
     result: LoopResult,
+    temperature: float | None = None,
+    tools: tuple[str, ...] = (),
     error: str | None = None,
 ) -> dict[str, Any]:
     """Assemble the trace document from the loop result."""
     return {
         "schema_version": TRACE_SCHEMA_VERSION,
         "run_id": str(run_id),
+        "attempt_number": attempt_number,
         "provider": provider,
         "model": model,
+        "parameters": {"temperature": temperature, "tools": list(tools)},
         "task": {"slug": task_slug, "version": task_version},
         "agent": {"slug": agent_slug, "version": agent_version},
         "steps": [_step_to_dict(step) for step in result.steps],

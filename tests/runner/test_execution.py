@@ -18,7 +18,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 from apps.runner.execution import execute_run_sync
-from tests.runner.conftest import FakeAdapter, response
+from tests.runner.fakes import FakeAdapter, response
 
 pytestmark = pytest.mark.integration
 
@@ -245,3 +245,81 @@ def test_terminal_run_is_left_alone(session_factory) -> None:  # type: ignore[no
     assert outcome.run_status == "cancelled"
     assert outcome.detail == "already terminal"
     assert adapter.calls == []
+
+
+def test_retried_provider_error_gets_distinct_trace_hash(session_factory) -> None:  # type: ignore[no-untyped-def]
+    adapter = FakeAdapter(error=RuntimeError("identical error text"))
+    run_id = _seed_run(session_factory)
+    execute_run_sync(run_id, session_factory=session_factory, registry=_registry(adapter))
+
+    # Retry path: an operator requeues the failed run.
+    with session_factory() as session:
+        run = session.get(Run, run_id)
+        run.status = "queued"
+        session.commit()
+
+    outcome = execute_run_sync(run_id, session_factory=session_factory, registry=_registry(adapter))
+    assert outcome.run_status == "failed"
+    _, attempts, traces, _ = _fetch(session_factory, run_id)
+    assert [a.outcome for a in attempts] == ["failed_provider_error", "failed_provider_error"]
+    assert len(traces) == 2
+    assert traces[0].hash != traces[1].hash
+
+
+def test_cost_model_error_leaves_run_terminal(session_factory) -> None:  # type: ignore[no-untyped-def]
+    adapter = FakeAdapter(
+        responses=[response("42")], cost_error=LookupError("no price line for model")
+    )
+    run_id = _seed_run(session_factory)
+    outcome = execute_run_sync(run_id, session_factory=session_factory, registry=_registry(adapter))
+    assert outcome.run_status == "failed"
+    assert outcome.attempt_outcome == "failed_adapter_error"
+    run, attempts, _, _ = _fetch(session_factory, run_id)
+    assert run.status == "failed"
+    assert "no price line" in (run.failure_reason or "")
+    assert attempts, "the failure must record an attempt"
+
+
+def test_provider_metadata_cost_wins_over_estimate(session_factory) -> None:  # type: ignore[no-untyped-def]
+    adapter = FakeAdapter(responses=[response("42", provider_metadata={"cost_usd": "0.123456"})])
+    run_id = _seed_run(session_factory)
+    outcome = execute_run_sync(run_id, session_factory=session_factory, registry=_registry(adapter))
+    assert outcome.run_status == "complete"
+    _, _, traces, _ = _fetch(session_factory, run_id)
+    assert traces[0].estimated_cost_usd == Decimal("0.123456")
+
+
+def test_unknown_tool_is_a_definition_error(session_factory) -> None:  # type: ignore[no-untyped-def]
+    adapter = FakeAdapter(responses=[response("42")])
+    run_id = _seed_run(
+        session_factory,
+        task_definition={"prompt": "q", "expected": "42", "tools": ["web_browser"]},
+    )
+    outcome = execute_run_sync(run_id, session_factory=session_factory, registry=_registry(adapter))
+    assert outcome.run_status == "failed"
+    assert outcome.attempt_outcome == "failed_adapter_error"
+    _, _, traces, _ = _fetch(session_factory, run_id)
+    assert traces == []
+    assert adapter.calls == []
+
+
+def test_fail_stale_runs_reaps_stranded_running(session_factory) -> None:  # type: ignore[no-untyped-def]
+    from datetime import timedelta
+
+    from apps.runner.execution import fail_stale_runs
+
+    run_id = _seed_run(session_factory)
+    with session_factory() as session:
+        run = session.get(Run, run_id)
+        run.status = "running"
+        run.started_at = datetime.now(UTC) - timedelta(hours=2)
+        session.commit()
+
+    reaped = fail_stale_runs(session_factory=session_factory, stale_after_seconds=3600)
+    assert reaped == 1
+    run, attempts, _, _ = _fetch(session_factory, run_id)
+    assert run.status == "failed"
+    assert [a.outcome for a in attempts] == ["failed_timeout"]
+
+    # Idempotent: a second sweep finds nothing.
+    assert fail_stale_runs(session_factory=session_factory, stale_after_seconds=3600) == 0

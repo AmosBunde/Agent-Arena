@@ -66,7 +66,9 @@ class TaskDefinition:
         if not isinstance(corpus, dict):
             raise DefinitionError("task 'search_corpus' must be an object")
         max_turns = raw.get("max_turns")
-        if max_turns is not None and (not isinstance(max_turns, int) or max_turns < 1):
+        if max_turns is not None and (
+            isinstance(max_turns, bool) or not isinstance(max_turns, int) or max_turns < 1
+        ):
             raise DefinitionError("task 'max_turns' must be a positive integer")
         return cls(
             prompt=prompt,

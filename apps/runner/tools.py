@@ -94,14 +94,31 @@ def execute_tool(name: str, arguments: dict[str, Any], task: TaskDefinition) -> 
     raise ToolExecutionError(f"unknown tool {name!r}")
 
 
+# Bounds keeping a hostile or confused model from stalling the worker: a
+# length cap on the expression and magnitude caps on exponentiation, which is
+# the one operator whose cost grows super-linearly with operand size.
+_MAX_EXPRESSION_LENGTH = 500
+_MAX_EXPONENT = 1000
+_MAX_POW_BASE_MAGNITUDE = 1_000_000.0
+
+
 def _evaluate_arithmetic(expression: str) -> str:
     """Evaluate arithmetic safely via the AST; no names, calls, or attributes."""
+    if len(expression) > _MAX_EXPRESSION_LENGTH:
+        raise ToolExecutionError(f"expression exceeds {_MAX_EXPRESSION_LENGTH} characters")
     try:
         tree = ast.parse(expression, mode="eval")
         result = _evaluate_node(tree.body)
     except ToolExecutionError:
         raise
-    except (SyntaxError, ZeroDivisionError, OverflowError, ValueError) as exc:
+    except (
+        SyntaxError,
+        ZeroDivisionError,
+        OverflowError,
+        ValueError,
+        RecursionError,
+        MemoryError,
+    ) as exc:
         raise ToolExecutionError(f"cannot evaluate expression: {exc}") from exc
     if isinstance(result, float) and result.is_integer():
         return str(int(result))
@@ -117,7 +134,13 @@ def _evaluate_node(node: ast.expr) -> float:
         op = _BINARY_OPERATORS.get(type(node.op))
         if op is None:
             raise ToolExecutionError(f"operator {type(node.op).__name__} is not allowed")
-        return op(_evaluate_node(node.left), _evaluate_node(node.right))
+        left = _evaluate_node(node.left)
+        right = _evaluate_node(node.right)
+        if isinstance(node.op, ast.Pow) and (
+            abs(right) > _MAX_EXPONENT or abs(left) > _MAX_POW_BASE_MAGNITUDE
+        ):
+            raise ToolExecutionError("exponentiation operands exceed the allowed magnitude")
+        return op(left, right)
     if isinstance(node, ast.UnaryOp):
         unary = _UNARY_OPERATORS.get(type(node.op))
         if unary is None:

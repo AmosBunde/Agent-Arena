@@ -6,7 +6,7 @@ import uuid
 
 from apps.runner.agent_loop import LoopResult, LoopStep
 from apps.runner.tracing import build_trace, serialise_trace
-from tests.runner.conftest import response
+from tests.runner.fakes import response
 
 RUN_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
@@ -19,6 +19,7 @@ def _trace(final_answer: str = "42") -> dict:  # type: ignore[type-arg]
     result.total_latency_ms = 100
     return build_trace(
         run_id=RUN_ID,
+        attempt_number=1,
         provider="fake",
         model="fake-model",
         task_slug="add",
