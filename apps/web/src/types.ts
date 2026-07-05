@@ -9,6 +9,7 @@ export interface Task {
   capabilities_required: string[];
   created_at: string;
   deprecated_at: string | null;
+  contamination: { status: string } | null;
 }
 
 export interface Rubric {
