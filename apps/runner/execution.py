@@ -39,6 +39,7 @@ from agent_arena.adapters import (
     missing_capabilities,
 )
 from agent_arena.db.models import Agent, Attempt, Rubric, Run, Score, Task, TraceMetadata
+from agent_arena.trace_store import TraceStore
 from celery.exceptions import SoftTimeLimitExceeded
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -96,8 +97,14 @@ def execute_run_sync(
     registry: AdapterSource,
     default_max_turns: int = 8,
     cancel_requested: CancelProbe = _never,
+    trace_store: TraceStore | None = None,
 ) -> ExecutionOutcome:
-    """Execute one run to a terminal state. Safe to call again after a crash."""
+    """Execute one run to a terminal state. Safe to call again after a crash.
+
+    ``trace_store`` receives every trace body (ADR-0003); without one the
+    metadata row is written with a NULL ``body_uri``, which keeps unit tests
+    and pre-M2 deployments working.
+    """
     with session_factory() as session:
         run = session.get(Run, run_id)
         if run is None:
@@ -124,6 +131,7 @@ def execute_run_sync(
                 registry=registry,
                 default_max_turns=default_max_turns,
                 cancel_requested=cancel_requested,
+                trace_store=trace_store,
             )
         except RunCancelled:
             session.rollback()
@@ -153,6 +161,7 @@ def _execute(
     registry: AdapterSource,
     default_max_turns: int,
     cancel_requested: CancelProbe,
+    trace_store: TraceStore | None,
 ) -> ExecutionOutcome:
     try:
         task_row, agent_row, rubric_row = _load_catalog(session, run)
@@ -216,6 +225,7 @@ def _execute(
             agent_row,
             adapter,
             LoopResult(),
+            trace_store=trace_store,
             temperature=agent.temperature,
             tools=task.tools,
             error=f"{type(exc).__name__}: {exc}",
@@ -237,6 +247,7 @@ def _execute(
                 agent_row,
                 adapter,
                 result,
+                trace_store=trace_store,
                 temperature=agent.temperature,
                 tools=task.tools,
             )
@@ -252,6 +263,7 @@ def _execute(
         agent_row,
         adapter,
         result,
+        trace_store=trace_store,
         temperature=agent.temperature,
         tools=task.tools,
     )
@@ -334,6 +346,7 @@ def _write_trace(
     adapter: AgentAdapter,
     result: LoopResult,
     *,
+    trace_store: TraceStore | None = None,
     temperature: float | None = None,
     tools: tuple[str, ...] = (),
     error: str | None = None,
@@ -353,11 +366,16 @@ def _write_trace(
         error=error,
     )
     serialised = serialise_trace(document)
+    body_uri = (
+        trace_store.put(serialised.hash, serialised.body.encode("utf-8"))
+        if trace_store is not None
+        else None
+    )
     trace = TraceMetadata(
         hash=serialised.hash,
         run_id=run.id,
         attempt_id=attempt.id,
-        body_uri=None,
+        body_uri=body_uri,
         body_size_bytes=serialised.size_bytes,
         provider=run.provider,
         model=run.model,

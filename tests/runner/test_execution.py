@@ -323,3 +323,27 @@ def test_fail_stale_runs_reaps_stranded_running(session_factory) -> None:  # typ
 
     # Idempotent: a second sweep finds nothing.
     assert fail_stale_runs(session_factory=session_factory, stale_after_seconds=3600) == 0
+
+
+def test_trace_body_persisted_through_store(session_factory, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from agent_arena.trace_store import LocalTraceStore
+
+    store = LocalTraceStore(tmp_path)
+    adapter = FakeAdapter(responses=[response("42")])
+    run_id = _seed_run(session_factory)
+    outcome = execute_run_sync(
+        run_id,
+        session_factory=session_factory,
+        registry=_registry(adapter),
+        trace_store=store,
+    )
+    assert outcome.run_status == "complete"
+    _, _, traces, _ = _fetch(session_factory, run_id)
+    trace = traces[0]
+    assert trace.body_uri is not None and trace.body_uri.startswith("file://")
+    body = store.get(trace.hash)
+    assert len(body) == trace.body_size_bytes
+    import json
+
+    document = json.loads(body)
+    assert document["final_answer"] == "42"
