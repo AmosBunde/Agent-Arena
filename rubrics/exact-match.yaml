@@ -1,0 +1,9 @@
+# String equality against the task's expected value after stripping
+# surrounding whitespace. See apps/runner/contracts.py for the contract.
+slug: exact-match
+version: "1"
+judge_required: false
+definition:
+  type: exact_match
+  strip_whitespace: true
+  case_insensitive: false

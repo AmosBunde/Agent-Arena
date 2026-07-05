@@ -1,0 +1,18 @@
+# Word problem with structured output. The expected value is an object whose
+# keys must match the answer JSON; pair with the json-key-match rubric.
+slug: word-problems-3
+version: "1"
+domain: general-reasoning
+capabilities_required:
+  - json_mode
+definition:
+  system: 'Respond with a JSON object of the form {"answer": <number>} and nothing else.'
+  prompt: >-
+    Ana reads 7 pages of a book every day for two weeks. How many pages does
+    she read in total?
+  expected:
+    answer: 98
+examples:
+  correct: '{"answer": 98}'
+  incorrect: '{"answer": 97}'
+recommended_rubric: json-key-match

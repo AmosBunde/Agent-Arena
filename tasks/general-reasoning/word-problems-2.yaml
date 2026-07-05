@@ -1,0 +1,16 @@
+# Multi-step word problem answered in a sentence. The expected value is a
+# regular expression; pair with the regex-match rubric.
+slug: word-problems-2
+version: "1"
+domain: general-reasoning
+capabilities_required: []
+definition:
+  prompt: >-
+    A bus starts with 96 passengers. At the first stop 25 passengers get off
+    and 37 get on. How many passengers are on the bus now? Answer in a full
+    sentence.
+  expected: '\b108\b'
+examples:
+  correct: The bus now carries 108 passengers.
+  incorrect: The bus now carries 1080 passengers.
+recommended_rubric: regex-match

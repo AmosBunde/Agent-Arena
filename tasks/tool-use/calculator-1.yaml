@@ -1,0 +1,16 @@
+# Arithmetic beyond mental range; the agent must call the calculator tool.
+slug: calculator-1
+version: "1"
+domain: tool-use
+capabilities_required:
+  - tool_calling
+definition:
+  system: Use the calculator tool for arithmetic. Answer with the number only.
+  prompt: Compute (17 * 23) + 89.
+  expected: "480"
+  tools:
+    - calculator
+examples:
+  correct: "480"
+  incorrect: "479"
+recommended_rubric: exact-match

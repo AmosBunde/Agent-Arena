@@ -1,0 +1,13 @@
+# Single-step arithmetic word problem. Pair with the exact-match rubric.
+slug: word-problems-1
+version: "1"
+domain: general-reasoning
+capabilities_required: []
+definition:
+  system: You are a careful assistant. Answer with the number only, no units and no prose.
+  prompt: A train travels at 50 kilometres per hour for 3 hours. How many kilometres does it travel?
+  expected: "150"
+examples:
+  correct: "150"
+  incorrect: "153"
+recommended_rubric: exact-match
