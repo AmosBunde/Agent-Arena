@@ -31,11 +31,17 @@ VIEWER = {"X-Forwarded-User": "alice", "X-Forwarded-User-Role": "viewer"}
 
 
 class _NullQueue:
+    def __init__(self) -> None:
+        self.judge_jobs: list[tuple[str, uuid.UUID]] = []
+
     def enqueue_run(self, run_id: uuid.UUID) -> None:
         pass
 
     def request_cancellation(self, run_id: uuid.UUID) -> None:
         pass
+
+    def enqueue_judge_score(self, trace_hash: str, rubric_id: uuid.UUID) -> None:
+        self.judge_jobs.append((trace_hash, rubric_id))
 
 
 @pytest.fixture(scope="module")
@@ -61,7 +67,12 @@ def store(tmp_path_factory: pytest.TempPathFactory) -> LocalTraceStore:
 
 
 @pytest.fixture(scope="module")
-def client(migrated_url: str, store: LocalTraceStore):  # type: ignore[no-untyped-def]
+def queue() -> _NullQueue:
+    return _NullQueue()
+
+
+@pytest.fixture(scope="module")
+def client(migrated_url: str, store: LocalTraceStore, queue: _NullQueue):  # type: ignore[no-untyped-def]
     engine = create_async_engine(migrated_url)
     factory = async_sessionmaker(bind=engine, expire_on_commit=False)
 
@@ -78,7 +89,7 @@ def client(migrated_url: str, store: LocalTraceStore):  # type: ignore[no-untype
         )
     )
     app.dependency_overrides[get_session] = override_session
-    app.dependency_overrides[get_queue] = lambda: _NullQueue()
+    app.dependency_overrides[get_queue] = lambda: queue
     app.dependency_overrides[get_trace_store] = lambda: store
     with TestClient(app) as test_client:
         yield test_client
@@ -193,9 +204,10 @@ def test_rescore_under_new_rubric_is_idempotent(
     assert len(detail["scores"]) == 2
 
 
-def test_rescore_rejects_judge_rubrics_for_now(
+def test_rescore_judge_rubric_enqueues_followup(
     client: TestClient,
     completed_trace: dict,  # type: ignore[type-arg]
+    queue: _NullQueue,
 ) -> None:
     unique = completed_trace["unique"]
     judge = client.post(
@@ -203,17 +215,23 @@ def test_rescore_rejects_judge_rubrics_for_now(
         json={
             "slug": f"judge-{unique}",
             "version": "1",
-            "definition": {"type": "exact_match", "judge": True, "salt": unique},
+            "definition": {
+                "type": "llm_judge",
+                "judge_provider": "openai",
+                "judge_model": "gpt-4o-mini",
+                "salt": unique,
+            },
             "judge_required": True,
         },
     ).json()
-    denied = client.post(
+    accepted = client.post(
         f"/api/v1/traces/{completed_trace['trace']['hash']}/score",
         json={"rubric_id": judge["id"]},
         headers=RUNNER,
     )
-    assert denied.status_code == 422
-    assert "issue #19" in denied.json()["detail"]
+    assert accepted.status_code == 202
+    assert accepted.json()["status"] == "queued"
+    assert queue.judge_jobs[-1] == (completed_trace["trace"]["hash"], uuid.UUID(judge["id"]))
 
 
 def test_rescore_requires_runner_role(

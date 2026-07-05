@@ -46,6 +46,8 @@ def score_answer(
         return _regex_match(task, final_answer)
     if rubric.type == "json_key_match":
         return _json_key_match(task, final_answer)
+    if rubric.type == "llm_judge":
+        raise ScoringError("llm_judge rubrics are scored through apps.runner.judging")
     raise ScoringError(f"unsupported rubric type {rubric.type!r}")
 
 

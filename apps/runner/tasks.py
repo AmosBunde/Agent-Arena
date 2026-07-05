@@ -27,6 +27,7 @@ from apps.runner.cancellation import is_cancellation_requested
 from apps.runner.celery_app import STALE_RUN_REAP_INTERVAL_SECONDS, celery_app, settings
 from apps.runner.db import get_engine, get_session_factory
 from apps.runner.execution import execute_run_sync, fail_stale_runs
+from apps.runner.judging import execute_judge_score
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +87,9 @@ def execute_run(run_id: str) -> str:
         default_max_turns=settings.default_max_turns,
         cancel_requested=lambda: cancel_requested(parsed),
         trace_store=_get_trace_store(),
+        enqueue_judge=lambda trace_hash, rubric_id: celery_app.send_task(
+            "runner.judge_score", args=[trace_hash, str(rubric_id)], queue="runs"
+        ),
     )
     logger.info(
         "run %s finished: status=%s attempt=%s detail=%s",
@@ -95,6 +99,20 @@ def execute_run(run_id: str) -> str:
         outcome.detail,
     )
     return outcome.run_status
+
+
+@celery_app.task(name="runner.judge_score")
+def judge_score(trace_hash: str, rubric_id: str) -> str:
+    """Score one trace under one judge rubric (follow-up job)."""
+    status = execute_judge_score(
+        trace_hash,
+        uuid.UUID(rubric_id),
+        session_factory=get_session_factory(settings),
+        registry=_ConfiguredRegistry(),
+        trace_store=_get_trace_store(),
+    )
+    logger.info("judge score for trace %s rubric %s: %s", trace_hash, rubric_id, status)
+    return status
 
 
 @celery_app.task(name="runner.refresh_leaderboard")

@@ -17,6 +17,7 @@ from apps.api.settings import ApiSettings
 from apps.runner.cancellation import request_cancellation
 
 EXECUTE_RUN_TASK = "runner.execute_run"
+JUDGE_SCORE_TASK = "runner.judge_score"
 RUNS_QUEUE = "runs"
 
 
@@ -34,6 +35,11 @@ class RunQueue:
 
     def request_cancellation(self, run_id: uuid.UUID) -> None:
         request_cancellation(self._redis, run_id)
+
+    def enqueue_judge_score(self, trace_hash: str, rubric_id: uuid.UUID) -> None:
+        self._celery.send_task(
+            JUDGE_SCORE_TASK, args=[trace_hash, str(rubric_id)], queue=RUNS_QUEUE
+        )
 
 
 _queue: RunQueue | None = None

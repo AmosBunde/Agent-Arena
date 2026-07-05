@@ -98,7 +98,7 @@ class AgentDefinition:
         return cls(system_prompt=system_prompt, temperature=temperature)
 
 
-RUBRIC_TYPES = ("exact_match", "regex_match", "json_key_match")
+RUBRIC_TYPES = ("exact_match", "regex_match", "json_key_match", "llm_judge")
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,14 +106,40 @@ class RubricDefinition:
     type: str
     case_insensitive: bool = False
     strip_whitespace: bool = True
+    # llm_judge only (issue #19). The judge call goes through the adapter
+    # layer; temperature defaults to zero for approximate reproducibility
+    # (ADR-0003).
+    judge_provider: str | None = None
+    judge_model: str | None = None
+    judge_temperature: float = 0.0
+    instructions: str | None = None
 
     @classmethod
     def parse(cls, raw: dict[str, Any]) -> RubricDefinition:
         rubric_type = raw.get("type")
         if rubric_type not in RUBRIC_TYPES:
             raise DefinitionError(f"rubric 'type' must be one of {RUBRIC_TYPES}")
+        judge_provider = raw.get("judge_provider")
+        judge_model = raw.get("judge_model")
+        judge_temperature = raw.get("judge_temperature", 0.0)
+        instructions = raw.get("instructions")
+        if rubric_type == "llm_judge":
+            if not isinstance(judge_provider, str) or not judge_provider:
+                raise DefinitionError("llm_judge rubrics require a 'judge_provider' string")
+            if not isinstance(judge_model, str) or not judge_model:
+                raise DefinitionError("llm_judge rubrics require a 'judge_model' string")
+            if isinstance(judge_temperature, bool) or not isinstance(
+                judge_temperature, int | float
+            ):
+                raise DefinitionError("'judge_temperature' must be a number")
+            if instructions is not None and not isinstance(instructions, str):
+                raise DefinitionError("'instructions' must be a string when present")
         return cls(
             type=rubric_type,
             case_insensitive=bool(raw.get("case_insensitive", False)),
             strip_whitespace=bool(raw.get("strip_whitespace", True)),
+            judge_provider=judge_provider if rubric_type == "llm_judge" else None,
+            judge_model=judge_model if rubric_type == "llm_judge" else None,
+            judge_temperature=float(judge_temperature) if rubric_type == "llm_judge" else 0.0,
+            instructions=instructions if rubric_type == "llm_judge" else None,
         )
