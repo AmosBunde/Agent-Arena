@@ -89,6 +89,7 @@ plugins = ["sqlalchemy.ext.mypy.plugin"]
 module = "apps.*"
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
+disallow_untyped_decorators = false
 warn_return_any = false
 
 # Celery ships no py.typed marker.

@@ -1,8 +1,8 @@
-"""Shared fixtures for database integration tests.
+"""Shared fixtures for the test suite.
 
-One Postgres 16 container per test session. Every test is self-contained: it
-migrates to the state it needs before asserting, so tests do not depend on
-execution order across modules sharing the container.
+One Postgres 16 container per test session for integration tests. Every test
+is self-contained: it migrates to the state it needs before asserting, so
+tests do not depend on execution order across modules sharing the container.
 """
 
 from __future__ import annotations
@@ -15,9 +15,11 @@ from typing import Any
 
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-# Make the namespace package importable even without an editable install.
-sys.path.insert(0, str(REPO_ROOT / "packages" / "db"))
+REPO_ROOT = Path(__file__).resolve().parents[1]
+# Make the namespace packages and the apps importable even without an
+# editable install.
+for _path in ("packages/db", "packages/adapters", "packages/cost-models", "."):
+    sys.path.insert(0, str(REPO_ROOT / _path))
 
 
 @pytest.fixture(scope="session")
