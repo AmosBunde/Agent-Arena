@@ -16,6 +16,7 @@ import redis
 # Importing the provider modules registers each adapter in the default
 # registry (side effect of the @register decorator).
 from agent_arena.adapters import anthropic_adapter as _anthropic  # noqa: F401
+from agent_arena.adapters import bedrock_adapter as _bedrock  # noqa: F401
 from agent_arena.adapters import default_registry
 from agent_arena.adapters import google_adapter as _google  # noqa: F401
 from agent_arena.adapters import ollama_adapter as _ollama  # noqa: F401
