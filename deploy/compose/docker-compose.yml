@@ -14,6 +14,13 @@
 x-app-env: &app_env
   DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-arena}:${POSTGRES_PASSWORD:-arena}@postgres:5432/${POSTGRES_DB:-arena}
   REDIS_URL: redis://redis:6379/0
+  # Trace bodies live in MinIO (ADR-0003); the api reads them for re-scoring
+  # and the runner writes them.
+  TRACE_STORE_URL: s3://arena-traces
+  S3_ENDPOINT_URL: http://minio:9000
+  AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-arena}
+  AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-arena-secret}
+  AWS_DEFAULT_REGION: us-east-1
 
 x-app-build: &app_build
   context: ../..
@@ -30,6 +37,21 @@ services:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-arena} -d ${POSTGRES_DB:-arena}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:RELEASE.2024-10-13T13-34-11Z
+    command: ["server", "/data"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-arena}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-arena-secret}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -58,6 +80,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     healthcheck:
       test:
@@ -97,6 +121,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     healthcheck:
       test:
@@ -158,3 +184,4 @@ services:
 
 volumes:
   postgres_data:
+  minio_data:

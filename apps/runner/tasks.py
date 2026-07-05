@@ -21,6 +21,7 @@ from agent_arena.adapters import google_adapter as _google  # noqa: F401
 from agent_arena.adapters import ollama_adapter as _ollama  # noqa: F401
 from agent_arena.adapters import openai_adapter as _openai  # noqa: F401
 from agent_arena.db.leaderboard import refresh_leaderboard
+from agent_arena.trace_store import TraceStore, store_from_url
 
 from apps.runner.cancellation import is_cancellation_requested
 from apps.runner.celery_app import STALE_RUN_REAP_INTERVAL_SECONDS, celery_app, settings
@@ -36,6 +37,14 @@ _ADAPTER_KWARGS: dict[str, dict[str, object]] = {
 }
 
 _redis_client: redis.Redis | None = None
+_trace_store: TraceStore | None = None
+
+
+def _get_trace_store() -> TraceStore:
+    global _trace_store
+    if _trace_store is None:
+        _trace_store = store_from_url(settings.trace_store_url)
+    return _trace_store
 
 
 def _get_redis() -> redis.Redis:
@@ -76,6 +85,7 @@ def execute_run(run_id: str) -> str:
         registry=_ConfiguredRegistry(),
         default_max_turns=settings.default_max_turns,
         cancel_requested=lambda: cancel_requested(parsed),
+        trace_store=_get_trace_store(),
     )
     logger.info(
         "run %s finished: status=%s attempt=%s detail=%s",

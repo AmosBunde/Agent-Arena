@@ -23,6 +23,9 @@ class RunnerSettings:
     # Defaults to zero, which makes local models look free; deployments that
     # care set LOCAL_HOURLY_RATE_USD.
     local_hourly_rate_usd: Decimal
+    # Where trace bodies live (ADR-0003): file path or s3://bucket. Compose
+    # points this at MinIO.
+    trace_store_url: str
     # Celery hard time limit per run (session-design.md: default ten minutes).
     run_time_limit_seconds: int
     # Soft limit fires SoftTimeLimitExceeded inside the task shortly before
@@ -40,6 +43,7 @@ class RunnerSettings:
             redis_url=os.environ.get("REDIS_URL", "redis://localhost:6379/0"),
             default_max_turns=int(os.environ.get("RUNNER_DEFAULT_MAX_TURNS", "8")),
             local_hourly_rate_usd=Decimal(os.environ.get("LOCAL_HOURLY_RATE_USD", "0")),
+            trace_store_url=os.environ.get("TRACE_STORE_URL", "data/traces"),
             run_time_limit_seconds=hard,
             run_soft_time_limit_seconds=int(
                 os.environ.get("RUNNER_SOFT_TIME_LIMIT_SECONDS", str(max(hard - 30, 1)))
