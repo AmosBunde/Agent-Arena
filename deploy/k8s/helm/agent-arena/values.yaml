@@ -1,0 +1,67 @@
+# The K8s deployment expects external managed Postgres, Redis, and an
+# S3-compatible object store (ADR-0001); the chart provisions none of them.
+# An auth proxy in front of the API owns identity (session-design.md), so
+# the default role here is the fail-safe viewer.
+
+image:
+  repository: agent-arena
+  tag: latest
+  pullPolicy: IfNotPresent
+
+webImage:
+  repository: agent-arena-web
+  tag: latest
+  pullPolicy: IfNotPresent
+
+externalPostgres:
+  # postgresql+psycopg://user:pass@host:5432/dbname (required)
+  url: ""
+
+externalRedis:
+  # redis://host:6379/0 (required)
+  url: ""
+
+objectStore:
+  traceStoreUrl: s3://arena-traces
+  # Leave empty for AWS S3; set for MinIO and other compatible stores.
+  endpointUrl: ""
+  accessKeyId: ""
+  secretAccessKey: ""
+  region: us-east-1
+
+api:
+  replicas: 2
+  defaultRole: viewer
+  resources: {}
+
+runner:
+  concurrency: 4
+  localHourlyRateUsd: "0"
+  resources: {}
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 75
+  # Provider API keys, injected from an existing secret if set.
+  existingProviderSecret: ""
+
+scheduler:
+  resources: {}
+
+web:
+  replicas: 1
+  resources: {}
+
+ingress:
+  enabled: false
+  className: ""
+  host: arena.example.com
+  annotations: {}
+  tls: []
+
+observability:
+  # Metrics and traces are on by default in K8s (system-design.md); the
+  # endpoints themselves land with issue #28.
+  metricsEnabled: true
+  otelExporterEndpoint: ""

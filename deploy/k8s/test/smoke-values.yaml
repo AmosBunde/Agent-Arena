@@ -1,0 +1,28 @@
+# Values for the kind smoke: images loaded into the cluster, in-cluster
+# service stand-ins, one replica of everything, autoscaling off (kind has no
+# metrics server).
+image:
+  repository: agent-arena
+  tag: smoke
+  pullPolicy: Never
+webImage:
+  repository: agent-arena-web
+  tag: smoke
+  pullPolicy: Never
+externalPostgres:
+  url: postgresql+psycopg://arena:arena@smoke-postgres:5432/arena
+externalRedis:
+  url: redis://smoke-redis:6379/0
+objectStore:
+  traceStoreUrl: s3://arena-traces
+  endpointUrl: http://smoke-minio:9000
+  accessKeyId: arena
+  secretAccessKey: arena-secret
+api:
+  replicas: 1
+runner:
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+web:
+  replicas: 1
