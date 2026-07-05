@@ -1,0 +1,30 @@
+# Single source of truth for the CI Python install recipe. Every job that
+# needs Python uses this action so the environment cannot drift between jobs.
+name: Set up Python environment
+description: Install Python and the hash-locked dependency set from requirements.lock.
+
+inputs:
+  python-version:
+    description: Python version to install.
+    required: false
+    default: "3.12"
+  editable:
+    description: Whether to install the repository package itself (pip install -e . --no-deps).
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+        cache: pip
+        cache-dependency-path: requirements.lock
+    - name: Install locked dependencies
+      shell: bash
+      run: pip install --require-hashes -r requirements.lock
+    - name: Install project
+      if: inputs.editable == 'true'
+      shell: bash
+      run: pip install -e . --no-deps
