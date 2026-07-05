@@ -1,0 +1,54 @@
+# Terraform validation for the three cloud modules (issue #27). AWS also
+# runs a full offline plan with credential validation skipped; the GCP and
+# DigitalOcean providers require live credentials to plan, so they gate at
+# fmt plus validate here and plan for real in an operator's environment.
+
+name: terraform
+
+on:
+  pull_request:
+    branches: [dev, main]
+    paths:
+      - "deploy/terraform/**"
+      - ".github/workflows/terraform-validate.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: terraform (${{ matrix.cloud }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        cloud: [aws, gcp, digitalocean]
+    defaults:
+      run:
+        working-directory: deploy/terraform/${{ matrix.cloud }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+      - name: terraform fmt
+        run: terraform fmt -check -diff
+      - name: terraform init
+        run: terraform init -backend=false -input=false
+      - name: terraform validate
+        run: terraform validate
+      - name: terraform plan (offline)
+        if: matrix.cloud == 'aws'
+        env:
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+        run: |
+          terraform plan -input=false -refresh=false \
+            -var skip_credentials_validation=true \
+            -var ami_id=ami-00000000000000000 \
+            -var key_name=ci \
+            -var allowed_ssh_cidr=203.0.113.0/24
