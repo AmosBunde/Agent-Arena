@@ -2,18 +2,15 @@
 
 The trace captures every provider round trip in the run, including the
 request parameters (temperature, offered tools) so the capture is auditable.
-In M1 the body is serialised deterministically (sorted keys, compact
-separators) to compute the content hash and size recorded in
-``traces.trace_metadata``; ``body_uri`` stays NULL until the
-content-addressed store lands (M2, issues #15 and #16), at which point the
-canonical serialisation defined there replaces this interim form.
+Serialisation and hashing use the canonical JSON rules from
+``agent_arena.schemas.trace_canonical`` (ADR-0003, issue #15); ``body_uri``
+stays NULL until the content-addressed store lands (issue #16).
 
-The interim body includes run and attempt identity, which makes every hash
-unique per attempt. That deliberately trades the cross-run deduplication
-property of ADR-0003 for insert safety: ``traces.trace_metadata`` keys on the
-hash and carries a run id, so two runs cannot share a row today. The
-canonical serialisation issue (#15) owns content-addressed identity and the
-migration of these interim hashes.
+The body includes run and attempt identity, which makes every hash unique
+per attempt. That deliberately trades the cross-run deduplication property
+of ADR-0003 for insert safety: ``traces.trace_metadata`` keys on the hash
+and carries a run id, so two runs cannot share a row today. The schema
+tension is tracked in issue #47.
 
 Authorization material never enters the trace: adapters read credentials
 from the environment and messages contain only conversation content
@@ -22,13 +19,12 @@ from the environment and messages contain only conversation content
 
 from __future__ import annotations
 
-import hashlib
-import json
 import uuid
 from dataclasses import dataclass
 from typing import Any
 
 from agent_arena.adapters import Message
+from agent_arena.schemas import canonical_json, trace_hash
 
 from apps.runner.agent_loop import LoopResult, LoopStep
 
@@ -82,10 +78,13 @@ def build_trace(
 
 
 def serialise_trace(trace: dict[str, Any]) -> SerialisedTrace:
-    """Deterministic interim serialisation; canonical form arrives with #15."""
-    body = json.dumps(trace, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-    digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
-    return SerialisedTrace(body=body, hash=digest, size_bytes=len(body.encode("utf-8")))
+    """Serialise through the canonical JSON rules (ADR-0003)."""
+    body = canonical_json(trace)
+    return SerialisedTrace(
+        body=body.decode("utf-8"),
+        hash=trace_hash(trace),
+        size_bytes=len(body),
+    )
 
 
 def _step_to_dict(step: LoopStep) -> dict[str, Any]:
