@@ -17,6 +17,7 @@ export function TasksView() {
           <th>Version</th>
           <th>Domain</th>
           <th>Required capabilities</th>
+          <th>Contamination</th>
           <th>Created</th>
         </tr>
       </thead>
@@ -27,6 +28,7 @@ export function TasksView() {
             <td>{task.version}</td>
             <td>{task.domain}</td>
             <td>{task.capabilities_required.join(", ") || "none"}</td>
+            <td>{task.contamination?.status ?? "unchecked"}</td>
             <td>{new Date(task.created_at).toLocaleString()}</td>
           </tr>
         ))}

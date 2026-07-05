@@ -29,6 +29,7 @@ class TaskOut(BaseModel):
     capabilities_required: list[str]
     created_at: datetime
     deprecated_at: datetime | None
+    contamination: dict[str, Any] | None = None
 
 
 class RubricIn(BaseModel):
