@@ -457,3 +457,65 @@ def fail_stale_runs(*, session_factory: SessionFactory, stale_after_seconds: int
             reaped += 1
         session.commit()
     return reaped
+
+
+def compute_leaderboard_cis(*, session_factory: SessionFactory, resamples: int = 1000) -> int:
+    """Recompute bootstrap intervals for every leaderboard cell (issue #23).
+
+    Reads per-trace (cost, is_correct) samples for complete runs, bootstraps
+    each (agent, task, provider, model, rubric) cell, and upserts
+    ``aggregates.leaderboard_ci``. Deterministic per cell, so reruns are
+    idempotent; scheduled on the beat alongside the view refresh.
+    """
+    from agent_arena.db.models import LeaderboardCi
+
+    from apps.runner.statistics import bootstrap_cell
+
+    statement = (
+        select(
+            Run.agent_id,
+            Run.task_id,
+            Run.provider,
+            Run.model,
+            Score.rubric_hash,
+            TraceMetadata.estimated_cost_usd,
+            Score.is_correct,
+        )
+        .join(Attempt, Attempt.run_id == Run.id)
+        .join(TraceMetadata, TraceMetadata.attempt_id == Attempt.id)
+        .join(Score, Score.trace_hash == TraceMetadata.hash)
+        .where(Run.status == "complete")
+    )
+    updated = 0
+    with session_factory() as session:
+        cells: dict[tuple[Any, ...], list[tuple[Decimal, bool]]] = {}
+        for row in session.execute(statement):
+            key = (row.agent_id, row.task_id, row.provider, row.model, row.rubric_hash)
+            cells.setdefault(key, []).append((row.estimated_cost_usd, row.is_correct))
+        for key, samples in cells.items():
+            agent_id, task_id, provider, model, rubric_hash = key
+            result = bootstrap_cell(
+                samples,
+                seed_key=f"{agent_id}:{task_id}:{provider}:{model}:{rubric_hash}",
+                resamples=resamples,
+            )
+            session.merge(
+                LeaderboardCi(
+                    agent_id=agent_id,
+                    task_id=task_id,
+                    provider=provider,
+                    model=model,
+                    rubric_hash=rubric_hash,
+                    accuracy=Decimal(str(round(result.accuracy, 4))),
+                    accuracy_ci_low=Decimal(str(round(result.accuracy_ci_low, 4))),
+                    accuracy_ci_high=Decimal(str(round(result.accuracy_ci_high, 4))),
+                    cpca_usd=result.cpca,
+                    cpca_ci_low_usd=result.cpca_ci_low,
+                    cpca_ci_high_usd=result.cpca_ci_high,
+                    resamples=result.resamples,
+                    computed_at=datetime.now(UTC),
+                )
+            )
+            updated += 1
+        session.commit()
+    return updated

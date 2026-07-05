@@ -23,7 +23,7 @@ EXPECTED_TABLES: dict[str, set[str]] = {
     },
     "runs": {"run_groups", "runs", "attempts"},
     "traces": {"trace_metadata"},
-    "aggregates": {"scores"},
+    "aggregates": {"scores", "leaderboard_ci"},
 }
 
 

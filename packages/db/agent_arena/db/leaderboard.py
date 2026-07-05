@@ -18,6 +18,7 @@ from sqlalchemy import (
     Select,
     Table,
     Text,
+    and_,
     select,
     text,
 )
@@ -94,4 +95,46 @@ def leaderboard_query() -> Select[tuple[object, ...]]:
         leaderboard.c.provider,
         leaderboard.c.model,
         leaderboard.c.rubric_hash,
+    )
+
+
+def leaderboard_with_ci_query() -> Select[tuple[object, ...]]:
+    """The leaderboard joined with bootstrap intervals (issue #23).
+
+    Left join: cells whose intervals have not been computed yet still appear
+    with NULL interval columns. Ordering matches :func:`leaderboard_query`.
+    """
+    from agent_arena.db.models import LeaderboardCi
+
+    ci = LeaderboardCi.__table__
+    joined = leaderboard.outerjoin(
+        ci,
+        and_(
+            leaderboard.c.agent_id == ci.c.agent_id,
+            leaderboard.c.task_id == ci.c.task_id,
+            leaderboard.c.provider == ci.c.provider,
+            leaderboard.c.model == ci.c.model,
+            leaderboard.c.rubric_hash == ci.c.rubric_hash,
+        ),
+    )
+    return (
+        select(
+            leaderboard,
+            ci.c.accuracy_ci_low,
+            ci.c.accuracy_ci_high,
+            ci.c.cpca_ci_low_usd,
+            ci.c.cpca_ci_high_usd,
+            ci.c.resamples.label("ci_resamples"),
+        )
+        .select_from(joined)
+        .order_by(
+            leaderboard.c.cost_per_correct_usd.asc().nulls_last(),
+            leaderboard.c.mean_score.desc(),
+            leaderboard.c.total_cost_usd.asc(),
+            leaderboard.c.agent_id,
+            leaderboard.c.task_id,
+            leaderboard.c.provider,
+            leaderboard.c.model,
+            leaderboard.c.rubric_hash,
+        )
     )

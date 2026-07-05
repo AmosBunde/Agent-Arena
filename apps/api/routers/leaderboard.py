@@ -11,7 +11,7 @@ caching work; the view itself is the cache in M1.
 
 from __future__ import annotations
 
-from agent_arena.db.leaderboard import leaderboard_query, refresh_statement
+from agent_arena.db.leaderboard import leaderboard_with_ci_query, refresh_statement
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,5 +38,5 @@ async def get_leaderboard(
             )
         await session.execute(refresh_statement(concurrently=False))
         await session.commit()
-    result = await session.execute(leaderboard_query().limit(limit).offset(offset))
+    result = await session.execute(leaderboard_with_ci_query().limit(limit).offset(offset))
     return [LeaderboardRowOut(**dict(row)) for row in result.mappings().all()]

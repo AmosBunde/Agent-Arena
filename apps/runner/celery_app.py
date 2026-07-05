@@ -48,6 +48,10 @@ celery_app.conf.update(
             "task": "runner.reap_stale_runs",
             "schedule": STALE_RUN_REAP_INTERVAL_SECONDS,
         },
+        "compute-leaderboard-ci": {
+            "task": "runner.compute_leaderboard_ci",
+            "schedule": REFRESH_INTERVAL_SECONDS,
+        },
     },
 )
 

@@ -332,12 +332,27 @@ def test_leaderboard_serves_view_rows(client: TestClient, migrated_url: str) -> 
         session.commit()
     sync_engine.dispose()
 
+    # Compute bootstrap intervals the way the scheduled job does (issue #23).
+    from sqlalchemy.orm import sessionmaker
+
+    from apps.runner.execution import compute_leaderboard_cis
+
+    ci_engine = create_engine(migrated_url)
+    compute_leaderboard_cis(
+        session_factory=sessionmaker(bind=ci_engine, expire_on_commit=False), resamples=100
+    )
+    ci_engine.dispose()
+
     response = client.get("/api/v1/leaderboard", params={"refresh": "true"})
     assert response.status_code == 200
     rows = [row for row in response.json() if row["agent_id"] == refs["agent_id"]]
     assert len(rows) == 1
     assert Decimal(str(rows[0]["cost_per_correct_usd"])) == Decimal("0.02")
     assert rows[0]["correct_count"] == 1
+    # Every cell carries the point estimate plus its interval once computed.
+    assert rows[0]["accuracy_ci_low"] is not None
+    assert rows[0]["accuracy_ci_high"] is not None
+    assert rows[0]["ci_resamples"] == 100
 
 
 def test_audit_log_records_state_changes(client: TestClient, migrated_url: str) -> None:
