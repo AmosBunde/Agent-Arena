@@ -9,5 +9,10 @@ COPY apps/web .
 RUN npm run build
 
 FROM nginx:1.27-alpine
-COPY deploy/docker/nginx.conf /etc/nginx/conf.d/default.conf
+# Rendered by the image entrypoint with envsubst; only exported environment
+# variables are substituted, so nginx runtime variables stay intact. The
+# default matches Compose; the Helm chart overrides it with the api service
+# name.
+ENV API_UPSTREAM=api:8000
+COPY deploy/docker/nginx.conf /etc/nginx/templates/default.conf.template
 COPY --from=build /web/dist /usr/share/nginx/html
