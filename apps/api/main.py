@@ -18,7 +18,7 @@ def create_app(settings: ApiSettings | None = None) -> FastAPI:
     resolved = settings or ApiSettings.from_env()
     app = FastAPI(
         title="Agent Arena API",
-        version="0.1.0",
+        version="1.0.0",
         dependencies=[Depends(validate_presented_bearer)],
         description=(
             "Cost-aware, provider-agnostic evaluation platform for LLM agents. "

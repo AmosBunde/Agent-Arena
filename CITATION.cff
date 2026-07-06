@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: If you use Agent Arena in your research, please cite it as below.
+title: "Agent Arena: a cost-aware, provider-agnostic evaluation platform for LLM agents"
+type: software
+authors:
+  - family-names: Bunde
+    given-names: Amos
+version: 1.0.0
+date-released: 2026-07-06
+repository-code: https://github.com/AmosBunde/Agent-Arena
+license: MIT
+keywords:
+  - large language models
+  - agents
+  - evaluation
+  - benchmarking
+  - cost analysis
+# A Zenodo DOI is minted from the v1.0.0 GitHub release once the Zenodo
+# integration is enabled for the repository; add the doi field here in the
+# same release cycle.
