@@ -51,7 +51,7 @@ This sounds heavy. It is. It is also the only thing that prevents architecture d
 
 ## PR checklist
 
-The template at [.github/pull_request_template.md](../../.github/pull_request_template.md) pre-fills every new PR with this checklist, so you tick the boxes in the PR body itself. For reference:
+The template at [.github/pull_request_template.md](https://github.com/AmosBunde/Agent-Arena/blob/main/.github/pull_request_template.md) pre-fills every new PR with this checklist, so you tick the boxes in the PR body itself. For reference:
 
 - The PR targets `dev`, not `main`.
 - The PR is linked to an issue via `Closes #N`.
@@ -60,7 +60,7 @@ The template at [.github/pull_request_template.md](../../.github/pull_request_te
 - ADRs are amended if architectural decisions are touched.
 - The commit history is clean enough that the reviewer can read it linearly.
 
-Continuous integration runs on every PR into `dev` and `main`; the required jobs are `lint`, `type-check`, `test`, `typescript`, and `smoke` (see [.github/workflows/ci.yml](../../.github/workflows/ci.yml)). The smoke job deploys the full Compose stack and probes the health endpoints, so a PR that breaks the deployment fails CI even when unit tests pass.
+Continuous integration runs on every PR into `dev` and `main`; the required jobs are `lint`, `type-check`, `test`, `typescript`, and `smoke` (see [.github/workflows/ci.yml](https://github.com/AmosBunde/Agent-Arena/blob/main/.github/workflows/ci.yml)). The smoke job deploys the full Compose stack and probes the health endpoints, so a PR that breaks the deployment fails CI even when unit tests pass.
 
 ## Reviewing
 

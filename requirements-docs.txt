@@ -1,0 +1,5 @@
+# Documentation site toolchain, used only by the docs workflow and local
+# doc preview. Deliberately separate from requirements.lock: the
+# application never imports these.
+mkdocs==1.6.1
+mkdocs-material==9.5.44
