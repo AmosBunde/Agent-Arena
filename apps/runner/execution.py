@@ -519,3 +519,19 @@ def compute_leaderboard_cis(*, session_factory: SessionFactory, resamples: int =
             updated += 1
         session.commit()
     return updated
+
+
+def find_stuck_queued_runs(
+    *, session_factory: SessionFactory, stuck_after_seconds: int
+) -> list[uuid.UUID]:
+    """Runs sitting in ``queued`` past the threshold (scheduler duty).
+
+    A producer accident or a task that died before execution leaves a run
+    queued with no message behind it. Re-enqueueing is safe because
+    execution is idempotent: a duplicate message finds the run terminal or
+    completes it from cache.
+    """
+    cutoff = datetime.now(UTC) - timedelta(seconds=stuck_after_seconds)
+    with session_factory() as session:
+        rows = session.execute(select(Run.id).where(Run.status == "queued", Run.queued_at < cutoff))
+        return [row[0] for row in rows]

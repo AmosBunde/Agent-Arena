@@ -52,3 +52,29 @@ def test_implausible_hash_rejected(tmp_path: Path) -> None:
     store = LocalTraceStore(tmp_path)
     with pytest.raises(ValueError, match="implausible"):
         store.put("ab", BODY)
+
+
+def test_ensure_bucket_tolerates_creation_race() -> None:
+    """The cold start race from issue #33: create losers must not raise."""
+    from types import SimpleNamespace
+
+    from agent_arena.trace_store import S3TraceStore
+    from botocore.exceptions import ClientError
+
+    def _client(create_code: str) -> SimpleNamespace:
+        def head_bucket(Bucket: str) -> None:  # noqa: N803
+            raise ClientError({"Error": {"Code": "404"}}, "HeadBucket")
+
+        def create_bucket(Bucket: str) -> None:  # noqa: N803
+            raise ClientError({"Error": {"Code": create_code}}, "CreateBucket")
+
+        return SimpleNamespace(
+            head_bucket=head_bucket,
+            create_bucket=create_bucket,
+            exceptions=SimpleNamespace(ClientError=ClientError),
+        )
+
+    S3TraceStore(_client("BucketAlreadyOwnedByYou"), bucket="arena-traces").ensure_bucket()
+    S3TraceStore(_client("BucketAlreadyExists"), bucket="arena-traces").ensure_bucket()
+    with pytest.raises(ClientError):
+        S3TraceStore(_client("AccessDenied"), bucket="arena-traces").ensure_bucket()

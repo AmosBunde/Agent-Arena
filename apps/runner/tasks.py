@@ -20,6 +20,7 @@ from agent_arena.adapters import anthropic_adapter as _anthropic  # noqa: F401
 from agent_arena.adapters import bedrock_adapter as _bedrock  # noqa: F401
 from agent_arena.adapters import default_registry
 from agent_arena.adapters import google_adapter as _google  # noqa: F401
+from agent_arena.adapters import mock_adapter as _mock  # noqa: F401
 from agent_arena.adapters import ollama_adapter as _ollama  # noqa: F401
 from agent_arena.adapters import openai_adapter as _openai  # noqa: F401
 from agent_arena.adapters import vllm_adapter as _vllm  # noqa: F401
@@ -29,7 +30,12 @@ from agent_arena.trace_store import TraceStore, store_from_url
 from apps.runner.cancellation import is_cancellation_requested
 from apps.runner.celery_app import STALE_RUN_REAP_INTERVAL_SECONDS, celery_app, settings
 from apps.runner.db import get_engine, get_session_factory
-from apps.runner.execution import compute_leaderboard_cis, execute_run_sync, fail_stale_runs
+from apps.runner.execution import (
+    compute_leaderboard_cis,
+    execute_run_sync,
+    fail_stale_runs,
+    find_stuck_queued_runs,
+)
 from apps.runner.judging import execute_judge_score
 from apps.runner.observability import record_run, run_span
 
@@ -139,7 +145,7 @@ def compute_leaderboard_ci() -> int:
 
 @celery_app.task(name="runner.reap_stale_runs")
 def reap_stale_runs() -> int:
-    """Repair runs stranded in ``running`` by a hard kill or lost worker."""
+    """Repair runs stranded by lost messages or killed workers."""
     threshold = max(settings.run_time_limit_seconds * 2, STALE_RUN_REAP_INTERVAL_SECONDS)
     reaped = fail_stale_runs(
         session_factory=get_session_factory(settings),
@@ -147,4 +153,12 @@ def reap_stale_runs() -> int:
     )
     if reaped:
         logger.warning("reaped %d stale runs", reaped)
-    return reaped
+    stuck = find_stuck_queued_runs(
+        session_factory=get_session_factory(settings),
+        stuck_after_seconds=STALE_RUN_REAP_INTERVAL_SECONDS,
+    )
+    for run_id in stuck:
+        celery_app.send_task("runner.execute_run", args=[str(run_id)], queue="runs")
+    if stuck:
+        logger.warning("re-enqueued %d runs stuck in queued", len(stuck))
+    return reaped + len(stuck)
