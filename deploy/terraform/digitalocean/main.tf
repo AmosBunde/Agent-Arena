@@ -52,6 +52,22 @@ resource "digitalocean_droplet" "arena" {
   })
 }
 
+resource "digitalocean_database_firewall" "postgres" {
+  cluster_id = digitalocean_database_cluster.postgres.id
+  rule {
+    type  = "droplet"
+    value = digitalocean_droplet.arena.id
+  }
+}
+
+resource "digitalocean_database_firewall" "redis" {
+  cluster_id = digitalocean_database_cluster.redis.id
+  rule {
+    type  = "droplet"
+    value = digitalocean_droplet.arena.id
+  }
+}
+
 resource "digitalocean_firewall" "arena" {
   name        = "${var.project_name}-fw"
   droplet_ids = [digitalocean_droplet.arena.id]

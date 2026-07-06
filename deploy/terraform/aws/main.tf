@@ -121,6 +121,7 @@ resource "aws_db_instance" "postgres" {
   password               = random_password.db.result
   db_subnet_group_name   = aws_db_subnet_group.arena.name
   vpc_security_group_ids = [aws_security_group.data.id]
+  storage_encrypted      = true
   skip_final_snapshot    = true
 }
 
@@ -150,6 +151,15 @@ resource "aws_s3_bucket_public_access_block" "traces" {
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "traces" {
+  bucket = aws_s3_bucket.traces.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
 }
 
 resource "aws_s3_bucket_versioning" "traces" {

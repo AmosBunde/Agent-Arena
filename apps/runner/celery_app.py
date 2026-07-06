@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from agent_arena.db.leaderboard import REFRESH_INTERVAL_SECONDS
 from celery import Celery
+from celery.signals import worker_init
 
 from apps.runner.settings import RunnerSettings
 
@@ -58,3 +59,11 @@ celery_app.conf.update(
 # Workers resolve apps.runner.tasks lazily at startup; no import here, which
 # would be circular (tasks.py imports this module).
 celery_app.autodiscover_tasks(["apps.runner"])
+
+
+@worker_init.connect
+def _start_observability(**_kwargs: object) -> None:
+    from apps.runner.observability import setup_tracing, start_metrics_server
+
+    start_metrics_server()
+    setup_tracing()
