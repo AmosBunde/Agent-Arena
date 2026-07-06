@@ -1,0 +1,31 @@
+import { useState } from "react";
+
+import { LeaderboardView } from "./views/LeaderboardView";
+import { NewRunView } from "./views/NewRunView";
+import { TasksView } from "./views/TasksView";
+import { TokensView } from "./views/TokensView";
+import { TracesView } from "./views/TracesView";
+
+const VIEWS = ["Tasks", "New run", "Leaderboard", "Traces", "Tokens"] as const;
+type View = (typeof VIEWS)[number];
+
+export function App() {
+  const [view, setView] = useState<View>("Tasks");
+  return (
+    <main>
+      <h1>Agent Arena</h1>
+      <nav aria-label="Views">
+        {VIEWS.map((name) => (
+          <button key={name} aria-current={view === name} onClick={() => setView(name)}>
+            {name}
+          </button>
+        ))}
+      </nav>
+      {view === "Tasks" && <TasksView />}
+      {view === "New run" && <NewRunView />}
+      {view === "Leaderboard" && <LeaderboardView />}
+      {view === "Traces" && <TracesView />}
+      {view === "Tokens" && <TokensView />}
+    </main>
+  );
+}

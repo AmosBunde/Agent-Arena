@@ -1,0 +1,71 @@
+# Kind cluster smoke for the Helm chart (issue #26): lint, template, install
+# with in-cluster dependency stand-ins, and probe the API through the
+# service. Runs only when the chart, images, or app code change.
+
+name: helm-smoke
+
+on:
+  pull_request:
+    branches: [dev, main]
+    paths:
+      - "deploy/k8s/**"
+      - "deploy/docker/**"
+      - "apps/**"
+      - "packages/**"
+      - ".github/workflows/helm-smoke.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: helm-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  helm-smoke:
+    name: helm-smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint and render the chart
+        run: |
+          helm lint deploy/k8s/helm/agent-arena \
+            --set externalPostgres.url=postgresql+psycopg://u:p@h:5432/d \
+            --set externalRedis.url=redis://h:6379/0
+          helm template smoke deploy/k8s/helm/agent-arena \
+            -f deploy/k8s/test/smoke-values.yaml > /dev/null
+      - name: Build images
+        run: |
+          docker build -t agent-arena:smoke -f deploy/docker/Dockerfile .
+          docker build -t agent-arena-web:smoke -f deploy/docker/web.Dockerfile .
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: arena-smoke
+      - name: Load images into kind
+        run: |
+          kind load docker-image agent-arena:smoke --name arena-smoke
+          kind load docker-image agent-arena-web:smoke --name arena-smoke
+      - name: Deploy dependency stand-ins
+        run: |
+          kubectl apply -f deploy/k8s/test/dependencies.yaml
+          kubectl wait --for=condition=available deployment/smoke-postgres --timeout=180s
+          kubectl wait --for=condition=available deployment/smoke-redis --timeout=180s
+          kubectl wait --for=condition=available deployment/smoke-minio --timeout=180s
+      - name: Install the chart
+        run: |
+          helm install smoke deploy/k8s/helm/agent-arena \
+            -f deploy/k8s/test/smoke-values.yaml --wait --timeout 5m
+      - name: Probe the API
+        run: |
+          kubectl run probe --image=curlimages/curl:8.10.1 --restart=Never --rm -i \
+            -- curl -fsS http://smoke-agent-arena-api:8000/health
+          kubectl run probe-web --image=curlimages/curl:8.10.1 --restart=Never --rm -i \
+            -- curl -fsS -o /dev/null http://smoke-agent-arena-web:80/
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          kubectl get pods -A
+          kubectl describe pods
+          kubectl logs -l app.kubernetes.io/component=api --tail=100 || true

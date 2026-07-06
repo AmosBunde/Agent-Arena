@@ -1,0 +1,128 @@
+# CI for pull requests into dev and main, plus post-merge runs on dev.
+#
+# Gates: ruff lint and format, mypy strict, pytest (unit and Docker-backed
+# integration), TypeScript checks once apps/web exists, and a smoke deploy.
+#
+# The smoke job exercises the deployable surface that exists today: the
+# Postgres slice plus Alembic migrations. Issue #12 delivers the full
+# single-VM stack (deploy/compose/docker-compose.yml) and extends this job
+# to deploy that stack and probe the API health endpoint. That extension is
+# an explicit part of issue #12; see the issue thread.
+
+name: CI
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev]
+
+permissions:
+  contents: read
+
+# Superseded pushes to the same PR cancel the in-flight run. Post-merge runs
+# on dev always complete so every merge commit keeps a CI verdict.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-python-env
+        with:
+          editable: "false"
+      - name: ruff check
+        run: ruff check .
+      - name: ruff format
+        run: ruff format --check .
+
+  type-check:
+    name: type-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-python-env
+      - name: mypy
+        run: mypy
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-python-env
+      - name: pytest
+        run: pytest -q
+
+  # Contract with apps/web (issue #11): the workspace uses npm with a
+  # committed package-lock.json, devDependencies include eslint, prettier,
+  # typescript, and vitest, and package.json defines a "lint" script and a
+  # "test" script that runs vitest. A package.json without a lockfile fails
+  # this job loudly rather than skipping, so a drifted contract surfaces in
+  # the PR that introduced it.
+  typescript:
+    name: typescript
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for TypeScript workspace
+        id: ts
+        run: |
+          if [ ! -f apps/web/package.json ]; then
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "apps/web/package.json not found; TypeScript checks are skipped until issue #11 lands."
+          elif [ ! -f apps/web/package-lock.json ]; then
+            echo "apps/web/package.json exists but package-lock.json is missing." >&2
+            echo "CI requires npm with a committed lockfile; see the contract comment in this workflow." >&2
+            exit 1
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.ts.outputs.present == 'true'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: TypeScript checks
+        if: steps.ts.outputs.present == 'true'
+        working-directory: apps/web
+        run: |
+          npm ci
+          npm run lint
+          npx prettier --check .
+          npx tsc --noEmit
+          npm test -- --run
+
+  # Deploys the full single-VM stack from issue #12 and probes the health
+  # endpoints. Migrations run inside the api container entrypoint, so the
+  # schema path is exercised too. The timeout has headroom over the four
+  # minute target from issue #1 because cold image builds dominate; the
+  # measured happy path stays under four minutes.
+  smoke:
+    name: smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Smoke deploy
+        run: |
+          docker compose -f deploy/compose/docker-compose.yml up -d --build --wait --wait-timeout 240
+          curl -fsS http://127.0.0.1:8000/health
+          curl -fsS http://127.0.0.1:3000/ > /dev/null
+          curl -fsS http://127.0.0.1:3000/api/v1/tasks > /dev/null
+          echo "Smoke checks passed."
+      - name: Logs on failure
+        if: failure()
+        run: docker compose -f deploy/compose/docker-compose.yml logs
+      - name: Teardown
+        if: always()
+        run: docker compose -f deploy/compose/docker-compose.yml down -v

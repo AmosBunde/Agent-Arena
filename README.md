@@ -4,13 +4,13 @@
 
 Most agent benchmarks measure accuracy and stop there. Agent Arena treats cost-per-correct-answer and latency as first-class leaderboard axes, runs the same task across six LLM backends through a single adapter, and captures every tool call so an agent run can be re-scored under a new rubric six months later without re-spending tokens.
 
-The project is designed to run from one command on a single VM, with a documented production migration path to Kubernetes for teams that need it.
+The project is designed to run from one command on a single VM, with a documented production migration path to Kubernetes for teams that need it. The API stability guarantee and semver policy live in [docs/STABILITY.md](docs/STABILITY.md).
 
 ---
 
 ## Status
 
-Pre-alpha. Milestone M1 is in progress. See [docs/MILESTONES.md](docs/MILESTONES.md) for the roadmap and [docs/adr/](docs/adr/) for the architecture decisions that shape what gets built and what does not.
+Milestones M1 through M5 are implemented. See [docs/MILESTONES.md](docs/MILESTONES.md) for the roadmap and [docs/adr/](docs/adr/) for the architecture decisions that shape what gets built and what does not. A public read-only reference deployment serving the curated task suite is documented in [docs/deployment/reference.md](docs/deployment/reference.md); its hosted URL is added there when the operator provisions it.
 
 ## Why this exists
 
@@ -27,15 +27,16 @@ None of these are revolutionary individually. The contribution is the combinatio
 The canonical deployment is single-VM Docker Compose, sized for a 20 USD per month cloud instance or a developer laptop. The production migration path is documented in [docs/deployment/kubernetes.md](docs/deployment/kubernetes.md) and is not required for any normal use of the project.
 
 ```bash
-git clone https://github.com/agent-arena-org/agent-arena.git
-cd agent-arena
+git clone https://github.com/AmosBunde/Agent-Arena.git
+cd Agent-Arena
 cp .env.example .env
 # Edit .env with at least one provider API key
-docker compose -f deploy/compose/docker-compose.yml up -d
-open http://localhost:3000
+set -a; . ./.env; set +a
+docker compose -f deploy/compose/docker-compose.yml up -d --build --wait
+open http://127.0.0.1:3000
 ```
 
-Time from clone to first leaderboard result: under five minutes on a fresh machine, assuming an API key is available.
+Time from clone to first leaderboard result: under five minutes on a fresh machine, assuming an API key is available. The full walkthrough, including seeding the example tasks and creating a first run, is in [docs/guides/quickstart.md](docs/guides/quickstart.md).
 
 ## How it works
 

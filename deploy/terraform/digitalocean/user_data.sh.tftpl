@@ -1,0 +1,13 @@
+#!/bin/bash
+set -euo pipefail
+apt-get update
+apt-get install -y docker.io docker-compose-v2 git
+git clone ${repository_url} /opt/agent-arena
+cat > /opt/agent-arena/.env <<ENV
+DATABASE_URL=${database_url}
+REDIS_URL=${redis_url}
+TRACE_STORE_URL=${trace_store_url}
+ENV
+cd /opt/agent-arena
+set -a; . ./.env; set +a
+docker compose -f deploy/compose/docker-compose.yml up -d --build

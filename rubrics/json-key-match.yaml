@@ -1,0 +1,7 @@
+# The final answer is parsed as JSON (fenced blocks tolerated) and every key
+# in the task's expected object must match.
+slug: json-key-match
+version: "1"
+judge_required: false
+definition:
+  type: json_key_match

@@ -6,6 +6,8 @@ The Alembic environment imports it for exactly that side effect.
 
 from __future__ import annotations
 
+from agent_arena.db.models.aggregates import Score
+from agent_arena.db.models.aggregates_ci import LeaderboardCi
 from agent_arena.db.models.catalog import (
     Agent,
     ApiToken,
@@ -23,11 +25,13 @@ __all__ = [
     "ApiToken",
     "AuditLogEntry",
     "Attempt",
+    "LeaderboardCi",
     "Pricing",
     "Provider",
     "Rubric",
     "Run",
     "RunGroup",
+    "Score",
     "Task",
     "TraceMetadata",
 ]

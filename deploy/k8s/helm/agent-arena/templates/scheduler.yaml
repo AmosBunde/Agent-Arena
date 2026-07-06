@@ -1,0 +1,39 @@
+# Single instance, idempotent duties (system-design.md).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "agent-arena.fullname" . }}-scheduler
+  labels:
+    {{- include "agent-arena.labels" . | nindent 4 }}
+    app.kubernetes.io/component: scheduler
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "agent-arena.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: scheduler
+  template:
+    metadata:
+      labels:
+        {{- include "agent-arena.labels" . | nindent 8 }}
+        app.kubernetes.io/component: scheduler
+    spec:
+      containers:
+        - name: scheduler
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - celery
+            - -A
+            - apps.runner.celery_app
+            - beat
+            - --loglevel=INFO
+            - --pidfile=/tmp/beat.pid
+            - --schedule=/tmp/beat-schedule
+          env:
+            {{- include "agent-arena.appEnv" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.scheduler.resources | nindent 12 }}

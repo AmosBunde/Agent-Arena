@@ -1,0 +1,11 @@
+# vLLM serves models locally. There is no per-token price; cost is computed
+# as (latency_seconds / 3600) * hourly_rate, where hourly_rate is set per
+# deployment (default 0). A zero default makes local models look free
+# relative to commercial APIs, which they are not -- see ADR-0004.
+provider: vllm
+is_local: true
+prices:
+  - model: meta-llama/Llama-3.1-8B-Instruct
+    valid_from: 2024-07-23
+  - model: Qwen/Qwen2.5-7B-Instruct
+    valid_from: 2024-09-19

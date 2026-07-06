@@ -1,0 +1,140 @@
+"""Leaderboard read side and refresh entry point.
+
+The ``aggregates.leaderboard`` materialised view is created in migration
+0002_aggregates from the SQL in docs/design/database-schema.md. This module
+gives the scheduler its refresh entry point and the API its presentation
+query. Cost-per-correct-answer semantics follow ADR-0004; the materialised
+view decision is ADR-0005.
+"""
+
+from __future__ import annotations
+
+from sqlalchemy import (
+    BigInteger,
+    Column,
+    Float,
+    MetaData,
+    Numeric,
+    Select,
+    Table,
+    Text,
+    and_,
+    select,
+    text,
+)
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.engine import Engine
+from sqlalchemy.sql.elements import TextClause
+
+# The scheduler refreshes the view on this interval (ADR-0005: five minutes).
+REFRESH_INTERVAL_SECONDS = 300
+
+# Deliberately NOT ``Base.metadata``: the migration environment autogenerates
+# against the shared metadata, and registering the view there would make
+# autogenerate emit a spurious ``create_table`` colliding with the
+# materialised view. Keep this Table on its own MetaData.
+_metadata = MetaData(schema="aggregates")
+
+# Static description of the materialised view for query building. The
+# authoritative definition is the migration; columns here must match it.
+leaderboard = Table(
+    "leaderboard",
+    _metadata,
+    Column("agent_id", UUID(as_uuid=True)),
+    Column("task_id", UUID(as_uuid=True)),
+    Column("provider", Text),
+    Column("model", Text),
+    Column("rubric_hash", Text),
+    Column("correct_count", BigInteger),
+    Column("total_count", BigInteger),
+    Column("mean_score", Numeric(6, 4)),
+    Column("total_cost_usd", Numeric(12, 6)),
+    Column("cost_per_correct_usd", Numeric(12, 6)),
+    Column("p50_latency_ms", Float),
+    Column("p95_latency_ms", Float),
+)
+
+
+def refresh_statement(*, concurrently: bool = True) -> TextClause:
+    """The refresh statement, shared by the scheduler and the API.
+
+    A concurrent refresh does not block readers and requires the unique index
+    from migration 0002, but cannot run inside a transaction block. A plain
+    refresh can, which is what the API's ``?refresh=true`` path uses inside
+    its request session.
+    """
+    keyword = " CONCURRENTLY" if concurrently else ""
+    return text(f"REFRESH MATERIALIZED VIEW{keyword} aggregates.leaderboard")
+
+
+def refresh_leaderboard(engine: Engine, *, concurrently: bool = True) -> None:
+    """Refresh the materialised view. Idempotent; safe to run on a schedule.
+
+    ``REFRESH MATERIALIZED VIEW CONCURRENTLY`` cannot run inside a
+    transaction block, so the statement executes on an autocommit connection.
+    """
+    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as connection:
+        connection.execute(refresh_statement(concurrently=concurrently))
+
+
+def leaderboard_query() -> Select[tuple[object, ...]]:
+    """The leaderboard in presentation order.
+
+    CPCA ascending with NULLs last per ADR-0004: a group with zero correct
+    answers has no defined CPCA and sorts after every priced group. The
+    governing documents specify only the CPCA sort; the remaining keys are a
+    presentation-level decision (higher mean score, then lower total cost)
+    with the view's unique key last so pagination is deterministic.
+    """
+    return select(leaderboard).order_by(
+        leaderboard.c.cost_per_correct_usd.asc().nulls_last(),
+        leaderboard.c.mean_score.desc(),
+        leaderboard.c.total_cost_usd.asc(),
+        leaderboard.c.agent_id,
+        leaderboard.c.task_id,
+        leaderboard.c.provider,
+        leaderboard.c.model,
+        leaderboard.c.rubric_hash,
+    )
+
+
+def leaderboard_with_ci_query() -> Select[tuple[object, ...]]:
+    """The leaderboard joined with bootstrap intervals (issue #23).
+
+    Left join: cells whose intervals have not been computed yet still appear
+    with NULL interval columns. Ordering matches :func:`leaderboard_query`.
+    """
+    from agent_arena.db.models import LeaderboardCi
+
+    ci = LeaderboardCi.__table__
+    joined = leaderboard.outerjoin(
+        ci,
+        and_(
+            leaderboard.c.agent_id == ci.c.agent_id,
+            leaderboard.c.task_id == ci.c.task_id,
+            leaderboard.c.provider == ci.c.provider,
+            leaderboard.c.model == ci.c.model,
+            leaderboard.c.rubric_hash == ci.c.rubric_hash,
+        ),
+    )
+    return (
+        select(
+            leaderboard,
+            ci.c.accuracy_ci_low,
+            ci.c.accuracy_ci_high,
+            ci.c.cpca_ci_low_usd,
+            ci.c.cpca_ci_high_usd,
+            ci.c.resamples.label("ci_resamples"),
+        )
+        .select_from(joined)
+        .order_by(
+            leaderboard.c.cost_per_correct_usd.asc().nulls_last(),
+            leaderboard.c.mean_score.desc(),
+            leaderboard.c.total_cost_usd.asc(),
+            leaderboard.c.agent_id,
+            leaderboard.c.task_id,
+            leaderboard.c.provider,
+            leaderboard.c.model,
+            leaderboard.c.rubric_hash,
+        )
+    )

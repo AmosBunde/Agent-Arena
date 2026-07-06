@@ -1,22 +1,13 @@
 """Acceptance test for issue #2.
 
-``alembic upgrade head`` on a fresh Postgres 16 produces the M1 schema, and
+``alembic upgrade head`` on a fresh Postgres 16 produces the schema, and
 ``alembic downgrade base`` reverses it cleanly. Runs against a real Postgres
 container, so it is marked ``integration`` and skips when Docker is absent.
 """
 
 from __future__ import annotations
 
-import os
-import sys
-from collections.abc import Iterator
-from pathlib import Path
-
 import pytest
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
-# Make the namespace package importable even without an editable install.
-sys.path.insert(0, str(REPO_ROOT / "packages" / "db"))
 
 pytestmark = pytest.mark.integration
 
@@ -32,41 +23,17 @@ EXPECTED_TABLES: dict[str, set[str]] = {
     },
     "runs": {"run_groups", "runs", "attempts"},
     "traces": {"trace_metadata"},
+    "aggregates": {"scores", "leaderboard_ci"},
 }
 
 
-@pytest.fixture(scope="module")
-def database_url() -> Iterator[str]:
-    try:
-        from testcontainers.postgres import PostgresContainer
-    except ImportError:  # pragma: no cover - dev dependency missing
-        pytest.skip("testcontainers is not installed")
-
-    try:
-        with PostgresContainer("postgres:16", driver="psycopg") as postgres:
-            yield postgres.get_connection_url()
-    except Exception as exc:  # pragma: no cover - Docker unavailable
-        pytest.skip(f"could not start Postgres container: {exc}")
-
-
-def _alembic_config(url: str):  # type: ignore[no-untyped-def]
-    from alembic.config import Config
-
-    os.environ["DATABASE_URL"] = url
-    config = Config(str(REPO_ROOT / "alembic.ini"))
-    config.set_main_option("script_location", str(REPO_ROOT / "migrations"))
-    config.set_main_option("sqlalchemy.url", url)
-    return config
-
-
-def test_upgrade_head_then_downgrade_base(database_url: str) -> None:
+def test_upgrade_head_then_downgrade_base(database_url: str, alembic_config) -> None:  # type: ignore[no-untyped-def]
     from alembic import command
     from sqlalchemy import create_engine, inspect
 
-    config = _alembic_config(database_url)
     engine = create_engine(database_url)
 
-    command.upgrade(config, "head")
+    command.upgrade(alembic_config, "head")
 
     inspector = inspect(engine)
     schemas = set(inspector.get_schema_names())
@@ -75,7 +42,7 @@ def test_upgrade_head_then_downgrade_base(database_url: str) -> None:
         actual = set(inspector.get_table_names(schema=schema))
         assert expected <= actual, f"missing tables in {schema}: {expected - actual}"
 
-    command.downgrade(config, "base")
+    command.downgrade(alembic_config, "base")
 
     inspector = inspect(engine)
     remaining = set(inspector.get_schema_names())

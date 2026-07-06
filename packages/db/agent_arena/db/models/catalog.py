@@ -50,6 +50,8 @@ class Task(Base):
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
     deprecated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Result of the contamination check (issue #25); NULL means never checked.
+    contamination: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 
 
 class Rubric(Base):

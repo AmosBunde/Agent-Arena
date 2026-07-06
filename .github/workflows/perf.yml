@@ -1,0 +1,42 @@
+# End to end throughput benchmark on the canonical Compose deployment
+# (issue #33): at least 10 runs per minute with simple tasks, measured with
+# the deterministic mock provider so no credentials or spend are involved.
+
+name: perf
+
+on:
+  pull_request:
+    branches: [dev, main]
+    paths:
+      - "apps/**"
+      - "packages/**"
+      - "deploy/compose/**"
+      - "deploy/docker/**"
+      - "scripts/benchmark.py"
+      - ".github/workflows/perf.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perf-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    name: benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy the stack
+        run: docker compose -f deploy/compose/docker-compose.yml up -d --build --wait --wait-timeout 240
+      - name: Benchmark 20 runs against the 10 per minute target
+        run: python3 scripts/benchmark.py --api-url http://127.0.0.1:8000 --runs 20 --target-per-minute 10
+      - name: Logs on failure
+        if: failure()
+        run: docker compose -f deploy/compose/docker-compose.yml logs --tail 100
+      - name: Teardown
+        if: always()
+        run: docker compose -f deploy/compose/docker-compose.yml down -v

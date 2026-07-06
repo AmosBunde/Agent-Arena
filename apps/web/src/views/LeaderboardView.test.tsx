@@ -1,0 +1,63 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+
+import type { LeaderboardRow } from "../types";
+import { LeaderboardView } from "./LeaderboardView";
+
+const ROW: LeaderboardRow = {
+  agent_id: "a",
+  task_id: "t",
+  provider: "openai",
+  model: "gpt-4o-mini",
+  rubric_hash: "r",
+  correct_count: 2,
+  total_count: 3,
+  mean_score: "0.6667",
+  total_cost_usd: "0.030000",
+  cost_per_correct_usd: "0.015000",
+  p50_latency_ms: 120,
+  p95_latency_ms: 250,
+  accuracy_ci_low: "0.3333",
+  accuracy_ci_high: "1.0000",
+  cpca_ci_low_usd: "0.010000",
+  cpca_ci_high_usd: "0.030000",
+  ci_resamples: 1000,
+};
+
+const ZERO_CORRECT: LeaderboardRow = {
+  ...ROW,
+  model: "wrong-model",
+  correct_count: 0,
+  cost_per_correct_usd: null,
+  accuracy_ci_low: null,
+  accuracy_ci_high: null,
+  cpca_ci_low_usd: null,
+  cpca_ci_high_usd: null,
+  ci_resamples: null,
+};
+
+vi.mock("../api", () => ({
+  api: { leaderboard: vi.fn() },
+}));
+
+const { api } = await import("../api");
+vi.mocked(api.leaderboard).mockResolvedValue([ROW, ZERO_CORRECT]);
+
+function renderView() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <LeaderboardView />
+    </QueryClientProvider>,
+  );
+}
+
+describe("LeaderboardView", () => {
+  it("renders CPCA and shows zero-correct groups without a number", async () => {
+    renderView();
+    expect(await screen.findByText("$0.015000 ($0.010000 to $0.030000)")).toBeInTheDocument();
+    expect(screen.getByText("no correct answers")).toBeInTheDocument();
+    expect(screen.getByText("2/3 (33% to 100%)")).toBeInTheDocument();
+  });
+});

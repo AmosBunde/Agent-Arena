@@ -1,0 +1,24 @@
+# AWS Bedrock pricing. USD per million tokens, on-demand, us-east-1. One line
+# per (model, valid_from); a line is valid until the next line's valid_from
+# for the same model. Model identifiers are Bedrock model ids.
+# Source: https://aws.amazon.com/bedrock/pricing/
+provider: bedrock
+prices:
+  - model: anthropic.claude-3-5-haiku-20241022-v1:0
+    valid_from: 2026-06-01
+    input_per_million_tokens: 0.80
+    output_per_million_tokens: 4.00
+    cached_input_per_million_tokens: 0.08
+  - model: anthropic.claude-sonnet-4-20250514-v1:0
+    valid_from: 2026-06-01
+    input_per_million_tokens: 3.00
+    output_per_million_tokens: 15.00
+    cached_input_per_million_tokens: 0.30
+  - model: mistral.mistral-large-2402-v1:0
+    valid_from: 2026-06-01
+    input_per_million_tokens: 4.00
+    output_per_million_tokens: 12.00
+  - model: mistral.mistral-small-2402-v1:0
+    valid_from: 2026-06-01
+    input_per_million_tokens: 1.00
+    output_per_million_tokens: 3.00

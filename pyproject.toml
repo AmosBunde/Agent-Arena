@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent-arena"
-version = "0.0.0"
+version = "1.0.0"
 description = "Cost-aware, provider-agnostic evaluation platform for LLM agents."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -13,6 +13,20 @@ dependencies = [
     "sqlalchemy>=2.0,<3.0",
     "alembic>=1.13,<2.0",
     "psycopg[binary]>=3.1,<4.0",
+    "pyyaml>=6,<7",
+    "openai>=2.0,<3",
+    "google-genai>=2.0,<3",
+    "anthropic>=0.69,<1",
+    "httpx>=0.28,<1",
+    "boto3>=1.34,<2",
+    "celery>=5.4,<6",
+    "redis>=5,<7",
+    "fastapi>=0.115,<1",
+    "uvicorn>=0.30,<1",
+    "prometheus-client>=0.20,<1",
+    "opentelemetry-sdk>=1.27,<2",
+    "opentelemetry-exporter-otlp-proto-http>=1.27,<2",
+    "argon2-cffi>=23,<26",
 ]
 
 [project.optional-dependencies]
@@ -20,19 +34,41 @@ dev = [
     "ruff>=0.6,<1.0",
     "mypy>=1.11,<2.0",
     "pytest>=8.0,<9.0",
+    "hypothesis>=6.100,<7",
     "testcontainers[postgres]>=4.0,<5.0",
+    "types-PyYAML>=6,<7",
+    "pip-tools>=7,<8",
 ]
 
-# Importable code lives under packages/ as the PEP 420 ``agent_arena`` namespace.
-# Each area (db, adapters, schemas, ...) contributes its own subpackage and is
-# wired in here as the corresponding issue lands it.
-[tool.setuptools.packages.find]
-where = ["packages/db"]
-include = ["agent_arena*"]
-namespaces = true
+# Importable code is the PEP 420 ``agent_arena`` namespace, assembled from one
+# directory per area (db, adapters, schemas, ...). setuptools' package finder
+# cannot split a single namespace across multiple roots, so each area's
+# concrete subpackages are mapped explicitly. New areas append their entries
+# to ``packages`` and ``package-dir`` as they land.
+[tool.setuptools]
+packages = [
+    "agent_arena.db",
+    "agent_arena.db.models",
+    "agent_arena.adapters",
+    "agent_arena.cost_models",
+    "agent_arena.cost_models.data",
+    "agent_arena.schemas",
+    "agent_arena.trace_store",
+]
+
+[tool.setuptools.package-dir]
+"agent_arena.db" = "packages/db/agent_arena/db"
+"agent_arena.adapters" = "packages/adapters/agent_arena/adapters"
+"agent_arena.cost_models" = "packages/cost-models/agent_arena/cost_models"
+"agent_arena.schemas" = "packages/schemas/agent_arena/schemas"
+"agent_arena.trace_store" = "packages/adapters-storage/agent_arena/trace_store"
 
 [tool.setuptools.package-data]
 "agent_arena.db" = ["py.typed"]
+"agent_arena.adapters" = ["py.typed"]
+"agent_arena.cost_models" = ["py.typed", "data/*.yaml"]
+"agent_arena.schemas" = ["py.typed"]
+"agent_arena.trace_store" = ["py.typed"]
 
 [tool.ruff]
 line-length = 100
@@ -41,6 +77,11 @@ extend-exclude = ["migrations/versions"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "W"]
+
+# FastAPI's dependency injection uses function calls in argument defaults by
+# design; teach bugbear they are immutable.
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Header"]
 
 [tool.ruff.format]
 line-ending = "lf"
@@ -51,10 +92,25 @@ strict = true
 # The importable ``agent_arena`` namespace is assembled from packages/<area>;
 # each area's root goes on mypy_path so the fully-qualified module name is
 # unambiguous. New areas append their root here as they land.
-mypy_path = "packages/db"
+mypy_path = [
+    "packages/db",
+    "packages/adapters",
+    "packages/cost-models",
+    "packages/schemas",
+    "packages/adapters-storage",
+    ".",
+]
 explicit_package_bases = true
 namespace_packages = true
-files = ["packages/db/agent_arena"]
+files = [
+    "packages/db/agent_arena",
+    "packages/adapters/agent_arena",
+    "packages/cost-models/agent_arena",
+    "packages/schemas/agent_arena",
+    "packages/adapters-storage/agent_arena",
+    "apps/runner",
+    "apps/api",
+]
 plugins = ["sqlalchemy.ext.mypy.plugin"]
 
 # Apps are services, not public packages: type-check them without --strict.
@@ -62,7 +118,13 @@ plugins = ["sqlalchemy.ext.mypy.plugin"]
 module = "apps.*"
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
+disallow_untyped_decorators = false
 warn_return_any = false
+
+# Celery and boto3 ship no py.typed marker.
+[[tool.mypy.overrides]]
+module = ["celery.*", "kombu.*", "boto3.*", "botocore.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["packages", "tests"]
