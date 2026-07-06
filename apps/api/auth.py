@@ -1,9 +1,17 @@
 """Authorisation per session-design.md.
 
-The API implements no login flow: an auth proxy owns identity and sends
-``X-Forwarded-User`` and ``X-Forwarded-User-Role``. Without the headers the
-configured defaults apply (admin in Compose, viewer in fail-safe
-deployments). Three roles: viewer < runner < admin.
+Two auth primitives, checked in order:
+
+1. **Bearer tokens** (``Authorization: Bearer arena_...``): long-lived
+   API tokens for programmatic access, hashed with Argon2id at rest
+   (issue #30). Verified against the database on every request, so
+   revocation takes effect immediately. An invalid or revoked token is a
+   401, never a silent fallback to header auth.
+2. **Proxy headers** (``X-Forwarded-User`` and ``X-Forwarded-User-Role``):
+   an auth proxy owns interactive identity. Without headers the configured
+   defaults apply (admin in Compose, viewer in fail-safe deployments).
+
+Three roles: viewer < runner < admin.
 """
 
 from __future__ import annotations
@@ -11,6 +19,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from fastapi import Depends, HTTPException, Request
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from apps.api.db import get_session
 
 ROLE_ORDER = {"viewer": 0, "runner": 1, "admin": 2}
 
@@ -24,7 +35,33 @@ class Principal:
         return ROLE_ORDER.get(self.role, -1) >= ROLE_ORDER[required]
 
 
-def get_principal(request: Request) -> Principal:
+async def validate_presented_bearer(
+    request: Request, session: AsyncSession = Depends(get_session)
+) -> None:
+    """App-level dependency: a presented bearer token must be live.
+
+    Runs on every route, including open reads, so a revoked or expired
+    token is a 401 everywhere the moment it is presented; credentials are
+    never silently ignored. The verified principal is cached on the request
+    so protected routes do not hash twice.
+    """
+    authorization = request.headers.get("Authorization", "")
+    if authorization.startswith("Bearer "):
+        from apps.api.tokens import authenticate_token
+
+        token = await authenticate_token(session, authorization.removeprefix("Bearer "))
+        if token is None:
+            raise HTTPException(status_code=401, detail="invalid, expired, or revoked token")
+        request.state.principal = Principal(user=f"token:{token.name}", role=token.role)
+
+
+async def get_principal(
+    request: Request, session: AsyncSession = Depends(get_session)
+) -> Principal:
+    cached = getattr(request.state, "principal", None)
+    if cached is not None:
+        return cached
+
     settings = request.app.state.settings
     user = request.headers.get("X-Forwarded-User", settings.default_user)
     role = request.headers.get("X-Forwarded-User-Role", settings.default_role)
@@ -34,7 +71,7 @@ def get_principal(request: Request) -> Principal:
 
 
 def require_role(required: str):  # noqa: ANN201 - FastAPI dependency factory
-    def dependency(principal: Principal = Depends(get_principal)) -> Principal:
+    async def dependency(principal: Principal = Depends(get_principal)) -> Principal:
         if not principal.has_role(required):
             raise HTTPException(
                 status_code=403,
