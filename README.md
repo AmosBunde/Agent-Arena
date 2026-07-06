@@ -4,7 +4,7 @@
 
 Most agent benchmarks measure accuracy and stop there. Agent Arena treats cost-per-correct-answer and latency as first-class leaderboard axes, runs the same task across six LLM backends through a single adapter, and captures every tool call so an agent run can be re-scored under a new rubric six months later without re-spending tokens.
 
-The project is designed to run from one command on a single VM, with a documented production migration path to Kubernetes for teams that need it.
+The project is designed to run from one command on a single VM, with a documented production migration path to Kubernetes for teams that need it. The API stability guarantee and semver policy live in [docs/STABILITY.md](docs/STABILITY.md).
 
 ---
 
