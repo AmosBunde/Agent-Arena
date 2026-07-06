@@ -20,11 +20,23 @@ class S3TraceStore:
         self._bucket = bucket
 
     def ensure_bucket(self) -> None:
-        """Create the bucket when missing. Idempotent; called at startup."""
+        """Create the bucket when missing.
+
+        Idempotent under concurrency: several worker processes race this at
+        cold start, and the create losers receive BucketAlreadyOwnedByYou
+        (or BucketAlreadyExists), which is success for our purposes.
+        """
         try:
             self._client.head_bucket(Bucket=self._bucket)
+            return
         except self._client.exceptions.ClientError:
+            pass
+        try:
             self._client.create_bucket(Bucket=self._bucket)
+        except self._client.exceptions.ClientError as exc:
+            code = exc.response.get("Error", {}).get("Code", "")
+            if code not in ("BucketAlreadyOwnedByYou", "BucketAlreadyExists"):
+                raise
 
     def put(self, trace_hash: str, body: bytes) -> str:
         key = object_key(trace_hash)
