@@ -9,6 +9,7 @@ duties).
 from __future__ import annotations
 
 import logging
+import time
 import uuid
 
 import redis
@@ -30,6 +31,7 @@ from apps.runner.celery_app import STALE_RUN_REAP_INTERVAL_SECONDS, celery_app, 
 from apps.runner.db import get_engine, get_session_factory
 from apps.runner.execution import compute_leaderboard_cis, execute_run_sync, fail_stale_runs
 from apps.runner.judging import execute_judge_score
+from apps.runner.observability import record_run, run_span
 
 logger = logging.getLogger(__name__)
 
@@ -83,17 +85,20 @@ class _ConfiguredRegistry:
 def execute_run(run_id: str) -> str:
     """Execute one agent run to a terminal state."""
     parsed = uuid.UUID(run_id)
-    outcome = execute_run_sync(
-        parsed,
-        session_factory=get_session_factory(settings),
-        registry=_ConfiguredRegistry(),
-        default_max_turns=settings.default_max_turns,
-        cancel_requested=lambda: cancel_requested(parsed),
-        trace_store=_get_trace_store(),
-        enqueue_judge=lambda trace_hash, rubric_id: celery_app.send_task(
-            "runner.judge_score", args=[trace_hash, str(rubric_id)], queue="runs"
-        ),
-    )
+    start = time.monotonic()
+    with run_span(run_id):
+        outcome = execute_run_sync(
+            parsed,
+            session_factory=get_session_factory(settings),
+            registry=_ConfiguredRegistry(),
+            default_max_turns=settings.default_max_turns,
+            cancel_requested=lambda: cancel_requested(parsed),
+            trace_store=_get_trace_store(),
+            enqueue_judge=lambda trace_hash, rubric_id: celery_app.send_task(
+                "runner.judge_score", args=[trace_hash, str(rubric_id)], queue="runs"
+            ),
+        )
+    record_run(outcome.run_status, outcome.attempt_outcome, time.monotonic() - start)
     logger.info(
         "run %s finished: status=%s attempt=%s detail=%s",
         run_id,

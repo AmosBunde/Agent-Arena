@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
+from apps.api.observability import setup_observability
 from apps.api.routers import catalog, leaderboard, runs, traces
 from apps.api.settings import ApiSettings
 
@@ -32,6 +33,7 @@ def create_app(settings: ApiSettings | None = None) -> FastAPI:
     app.include_router(runs.router)
     app.include_router(traces.router)
     app.include_router(leaderboard.router)
+    setup_observability(app)
     return app
 
 
