@@ -25,6 +25,9 @@ spec:
           ports:
             - containerPort: 80
               name: http
+          env:
+            - name: API_UPSTREAM
+              value: "{{ include "agent-arena.fullname" . }}-api:8000"
           readinessProbe:
             httpGet:
               path: /
