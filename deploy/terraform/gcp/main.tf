@@ -42,6 +42,11 @@ resource "google_compute_firewall" "ssh" {
   source_ranges = [var.allowed_ssh_cidr]
 }
 
+resource "google_compute_address" "vm" {
+  name   = "${var.project_name}-vm-ip"
+  region = var.region
+}
+
 resource "google_sql_database_instance" "postgres" {
   name             = "${var.project_name}-postgres"
   database_version = "POSTGRES_16"
@@ -50,6 +55,11 @@ resource "google_sql_database_instance" "postgres" {
     tier = var.db_tier
     ip_configuration {
       ipv4_enabled = true
+      ssl_mode     = "ENCRYPTED_ONLY"
+      authorized_networks {
+        name  = "arena-vm"
+        value = google_compute_address.vm.address
+      }
     }
   }
   deletion_protection = false
@@ -96,7 +106,9 @@ resource "google_compute_instance" "arena" {
 
   network_interface {
     subnetwork = google_compute_subnetwork.arena.id
-    access_config {}
+    access_config {
+      nat_ip = google_compute_address.vm.address
+    }
   }
 
   metadata_startup_script = templatefile("${path.module}/startup.sh.tftpl", {
