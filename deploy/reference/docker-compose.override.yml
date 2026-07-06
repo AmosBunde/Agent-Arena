@@ -1,0 +1,21 @@
+# Reference deployment overrides (issue #34). Combine with the canonical
+# stack:
+#
+#   docker compose -f deploy/compose/docker-compose.yml \
+#     -f deploy/reference/docker-compose.override.yml up -d --wait
+#
+# The API defaults every anonymous request to the read-only viewer role, so
+# the public site serves the leaderboard, tasks, and traces but cannot
+# create runs or spend money. Operators create runs with an admin API token
+# (issue #30) or from inside the host. An HTTPS reverse proxy (Caddy,
+# nginx, or a cloud load balancer) terminates TLS in front of the web port;
+# the ports below stay bound to localhost so nothing is public without it.
+
+services:
+  api:
+    environment:
+      API_DEFAULT_ROLE: viewer
+      API_DEFAULT_USER: public
+  web:
+    ports:
+      - "127.0.0.1:3000:80"

@@ -10,7 +10,7 @@ The project is designed to run from one command on a single VM, with a documente
 
 ## Status
 
-Pre-alpha. Milestone M1 is in progress. See [docs/MILESTONES.md](docs/MILESTONES.md) for the roadmap and [docs/adr/](docs/adr/) for the architecture decisions that shape what gets built and what does not.
+Milestones M1 through M5 are implemented. See [docs/MILESTONES.md](docs/MILESTONES.md) for the roadmap and [docs/adr/](docs/adr/) for the architecture decisions that shape what gets built and what does not. A public read-only reference deployment serving the curated task suite is documented in [docs/deployment/reference.md](docs/deployment/reference.md); its hosted URL is added there when the operator provisions it.
 
 ## Why this exists
 
