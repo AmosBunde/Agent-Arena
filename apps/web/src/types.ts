@@ -176,3 +176,18 @@ export interface ParetoRow {
   cost_per_correct_usd: string | null;
   on_front: boolean;
 }
+
+export interface ApiToken {
+  id: string;
+  name: string;
+  prefix: string;
+  role: string;
+  created_by: string;
+  created_at: string;
+  expires_at: string | null;
+  revoked_at: string | null;
+}
+
+export interface CreatedApiToken extends ApiToken {
+  token: string;
+}

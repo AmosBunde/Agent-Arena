@@ -3,6 +3,8 @@
 
 import type {
   Agent,
+  ApiToken,
+  CreatedApiToken,
   LeaderboardRow,
   Run,
   RunCreateRequest,
@@ -63,6 +65,14 @@ export const api = {
   leaderboard: (refresh: boolean) =>
     request<LeaderboardRow[]>(`/api/v1/leaderboard${refresh ? "?refresh=true" : ""}`),
   paretoFront: () => request<ParetoRow[]>("/api/v1/leaderboard/pareto"),
+  listTokens: () => request<ApiToken[]>("/api/v1/tokens"),
+  createToken: (name: string, role: string) =>
+    request<CreatedApiToken>("/api/v1/tokens", {
+      method: "POST",
+      body: JSON.stringify({ name, role }),
+    }),
+  revokeToken: (id: string) =>
+    request<ApiToken>(`/api/v1/tokens/${encodeURIComponent(id)}`, { method: "DELETE" }),
   listTraces: (runId?: string) =>
     request<TraceMetadata[]>(
       runId ? `/api/v1/traces?run_id=${encodeURIComponent(runId)}` : "/api/v1/traces",

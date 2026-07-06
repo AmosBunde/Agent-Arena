@@ -162,6 +162,30 @@ class CancellationOut(BaseModel):
     detail: str
 
 
+class TokenIn(BaseModel):
+    name: str = Field(min_length=1)
+    role: str
+    expires_at: datetime | None = None
+
+
+class TokenOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    prefix: str
+    role: str
+    created_by: str
+    created_at: datetime
+    expires_at: datetime | None
+    revoked_at: datetime | None
+
+
+class TokenCreatedOut(TokenOut):
+    # The plaintext value; present only in the creation response.
+    token: str
+
+
 class ParetoRowOut(BaseModel):
     agent_id: uuid.UUID
     task_id: uuid.UUID
