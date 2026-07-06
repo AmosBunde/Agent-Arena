@@ -1,0 +1,40 @@
+site_name: Agent Arena
+site_description: Cost-aware, provider-agnostic evaluation platform for LLM agents.
+site_url: https://amosbunde.github.io/Agent-Arena/
+repo_url: https://github.com/AmosBunde/Agent-Arena
+docs_dir: docs
+theme:
+  name: material
+  palette:
+    - scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+nav:
+  - Home: index.md
+  - Quickstart: guides/quickstart.md
+  - Guides:
+      - Contributing: guides/contributing.md
+      - Per-issue workflow: guides/per-issue-workflow.md
+  - Design:
+      - System design: design/system-design.md
+      - Session design: design/session-design.md
+      - Database schema: design/database-schema.md
+  - ADRs:
+      - Deployment topology: adr/0001-deployment-topology.md
+      - Provider adapter pattern: adr/0002-provider-adapter-pattern.md
+      - Content-addressed trace store: adr/0003-content-addressed-trace-store.md
+      - Cost model: adr/0004-cost-model.md
+      - Database architecture: adr/0005-database-architecture.md
+  - Deployment:
+      - Kubernetes: deployment/kubernetes.md
+      - Backup and restore: deployment/backup.md
+      - Trace storage: deployment/storage.md
+  - Stability policy: STABILITY.md
+  - Milestones: MILESTONES.md
+  - Reports:
+      - Contamination (M1): reports/contamination-m1.md
